@@ -9,7 +9,7 @@ export default function Admin() {
   const [infoSystems, setInfoSystems] = useState([])
   const [tab, setTab] = useState('departments')
   const [editing, setEditing] = useState(null)
-  const [form, setForm] = useState({ name: '', department: '', stream: '' })
+  const [form, setForm] = useState({ name: '', short_name: '', department: '', stream: '', code: '' })
   const [error, setError] = useState('')
 
   const toList = (r) => (Array.isArray(r?.results) ? r.results : Array.isArray(r) ? r : [])
@@ -27,17 +27,17 @@ export default function Admin() {
     setError('')
     try {
       if (tab === 'departments') {
-        if (editing) await api.departments.update(editing.id, { name: form.name })
-        else await api.departments.create({ name: form.name })
+        if (editing) await api.departments.update(editing.id, { name: form.name, short_name: form.short_name })
+        else await api.departments.create({ name: form.name, short_name: form.short_name })
       } else if (tab === 'streams') {
         if (editing) await api.streams.update(editing.id, { name: form.name, department: form.department })
         else await api.streams.create({ name: form.name, department: form.department })
       } else {
-        if (editing) await api.infoSystems.update(editing.id, { name: form.name, stream: form.stream })
-        else await api.infoSystems.create({ name: form.name, stream: form.stream })
+        if (editing) await api.infoSystems.update(editing.id, { name: form.name, code: form.code, stream: form.stream })
+        else await api.infoSystems.create({ name: form.name, code: form.code, stream: form.stream })
       }
       setEditing(null)
-      setForm({ name: '', department: '', stream: '' })
+      setForm({ name: '', short_name: '', department: '', stream: '', code: '' })
       load()
     } catch (err) {
       setError(err.body?.name?.[0] || err.body?.detail || err.message || 'Ошибка')
@@ -61,9 +61,9 @@ export default function Admin() {
   const startEdit = (item, t) => {
     setTab(t)
     setEditing(item)
-    if (t === 'departments') setForm({ name: item.name, department: '', stream: '' })
-    else if (t === 'streams') setForm({ name: item.name, department: item.department, stream: '' })
-    else setForm({ name: item.name, department: '', stream: item.stream })
+    if (t === 'departments') setForm({ name: item.name, short_name: item.short_name || '', department: '', stream: '', code: '' })
+    else if (t === 'streams') setForm({ name: item.name, short_name: '', department: item.department, stream: '', code: '' })
+    else setForm({ name: item.name, short_name: '', department: '', stream: item.stream, code: item.code || '' })
   }
 
   return (
@@ -76,7 +76,7 @@ export default function Admin() {
               key={t}
               type="button"
               className={tab === t ? 'btn' : 'btn btn-secondary'}
-              onClick={() => { setTab(t); setEditing(null); setForm({ name: '', department: '', stream: '' }); }}
+              onClick={() => { setTab(t); setEditing(null); setForm({ name: '', short_name: '', department: '', stream: '', code: '' }); }}
             >
               {t === 'departments' && 'Департаменты'}
               {t === 'streams' && 'Стримы'}
@@ -94,6 +94,15 @@ export default function Admin() {
               required
             />
           </div>
+          {tab === 'departments' && (
+            <div className="form-group">
+              <label>Краткое название</label>
+              <input
+                value={form.short_name}
+                onChange={(e) => setForm((f) => ({ ...f, short_name: e.target.value }))}
+              />
+            </div>
+          )}
           {tab === 'streams' && (
             <div className="form-group">
               <label>Департамент</label>
@@ -110,19 +119,29 @@ export default function Admin() {
             </div>
           )}
           {tab === 'info-systems' && (
-            <div className="form-group">
-              <label>Стрим</label>
-              <select
-                value={form.stream}
-                onChange={(e) => setForm((f) => ({ ...f, stream: e.target.value }))}
-                required
-              >
-                <option value="">—</option>
-                {streams.map((s) => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
-                ))}
-              </select>
-            </div>
+            <>
+              <div className="form-group">
+                <label>Код ИС</label>
+                <input
+                  value={form.code}
+                  onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
+                  placeholder="Код информационной системы"
+                />
+              </div>
+              <div className="form-group">
+                <label>Стрим</label>
+                <select
+                  value={form.stream}
+                  onChange={(e) => setForm((f) => ({ ...f, stream: e.target.value }))}
+                  required
+                >
+                  <option value="">—</option>
+                  {streams.map((s) => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
+              </div>
+            </>
           )}
           {error && <p className="error-msg">{error}</p>}
           <button type="submit" className="btn">{editing ? 'Сохранить' : 'Создать'}</button>
@@ -139,12 +158,13 @@ export default function Admin() {
           <div className="table-wrap">
             <table>
               <thead>
-                <tr><th>Название</th><th></th></tr>
+                <tr><th>Название</th><th>Краткое название</th><th></th></tr>
               </thead>
               <tbody>
                 {departments.map((d) => (
                   <tr key={d.id}>
                     <td>{d.name}</td>
+                    <td>{d.short_name || '—'}</td>
                     <td>
                       <button className="btn btn-sm btn-secondary" onClick={() => startEdit(d, 'departments')}>Изменить</button>
                       <button className="btn btn-sm btn-danger" style={{ marginLeft: '0.5rem' }} onClick={() => handleDelete('departments', d.id)}>Удалить</button>
@@ -180,12 +200,13 @@ export default function Admin() {
           <div className="table-wrap">
             <table>
               <thead>
-                <tr><th>Название</th><th>Стрим</th><th></th></tr>
+                <tr><th>Название</th><th>Код</th><th>Стрим</th><th></th></tr>
               </thead>
               <tbody>
                 {infoSystems.map((isys) => (
                   <tr key={isys.id}>
                     <td>{isys.name}</td>
+                    <td>{isys.code || '—'}</td>
                     <td>{isys.stream_name}</td>
                     <td>
                       <button className="btn btn-sm btn-secondary" onClick={() => startEdit(isys, 'info-systems')}>Изменить</button>

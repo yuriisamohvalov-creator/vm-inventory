@@ -4,7 +4,7 @@ from .models import Department, Stream, InfoSystem, VM, Pool, PoolVM
 
 @admin.register(Department)
 class DepartmentAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name')
+    list_display = ('id', 'name', 'short_name')
 
 
 @admin.register(Stream)
@@ -15,7 +15,7 @@ class StreamAdmin(admin.ModelAdmin):
 
 @admin.register(InfoSystem)
 class InfoSystemAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name', 'stream')
+    list_display = ('id', 'name', 'code', 'stream')
     list_filter = ('stream',)
 
 

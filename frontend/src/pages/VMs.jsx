@@ -36,10 +36,10 @@ export default function VMs() {
   const list = Array.isArray(vms) ? vms : (vms.results || [])
 
   const buildTags = () => {
-    const isName = form.info_system
-      ? (infoSystems.find((is) => is.id === form.info_system)?.name || '').toUpperCase().replace(/\s/g, '_')
+    const isCode = form.info_system
+      ? (infoSystems.find((is) => is.id === form.info_system)?.code || '').toString().trim().toUpperCase().replace(/\s/g, '_')
       : ''
-    return [form.osTag, isName, ...form.customTags]
+    return [form.osTag, isCode, ...form.customTags]
   }
 
   const handleSave = async (e) => {
@@ -142,7 +142,7 @@ export default function VMs() {
             >
               <option value="">— не выбрана —</option>
               {infoSystems.map((is) => (
-                <option key={is.id} value={is.id}>{is.name} ({is.stream_name})</option>
+                <option key={is.id} value={is.id}>{is.name}{is.code ? ` [${is.code}]` : ''} ({is.stream_name})</option>
               ))}
             </select>
           </div>
@@ -163,11 +163,11 @@ export default function VMs() {
             </div>
           </div>
           <div className="form-group">
-            <label>Тег ИС (авто)</label>
+            <label>Тег ИС (код, авто)</label>
             <input
               value={
                 form.info_system
-                  ? (infoSystems.find((is) => is.id === form.info_system)?.name || '').toUpperCase().replace(/\s/g, '_')
+                  ? (infoSystems.find((is) => is.id === form.info_system)?.code || '').toString().trim().toUpperCase().replace(/\s/g, '_') || '—'
                   : '—'
               }
               disabled
