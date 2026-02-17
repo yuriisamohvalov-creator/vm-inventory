@@ -12,10 +12,12 @@ export default function Admin() {
   const [form, setForm] = useState({ name: '', department: '', stream: '' })
   const [error, setError] = useState('')
 
+  const toList = (r) => (Array.isArray(r?.results) ? r.results : Array.isArray(r) ? r : [])
+
   const load = () => {
-    api.departments.list().then(setDepartments).catch(() => setDepartments([]))
-    api.streams.list().then(setStreams).catch(() => setStreams([]))
-    api.infoSystems.list().then(setInfoSystems).catch(() => setInfoSystems([]))
+    api.departments.list().then((r) => setDepartments(toList(r))).catch(() => setDepartments([]))
+    api.streams.list().then((r) => setStreams(toList(r))).catch(() => setStreams([]))
+    api.infoSystems.list().then((r) => setInfoSystems(toList(r))).catch(() => setInfoSystems([]))
   }
 
   useEffect(() => { load() }, [])
