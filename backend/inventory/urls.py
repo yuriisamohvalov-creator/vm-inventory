@@ -2,6 +2,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from . import views
 from . import import_export
+from .report_export import ReportExportView
 
 router = DefaultRouter()
 router.register('departments', views.DepartmentViewSet, basename='department')
@@ -23,6 +24,8 @@ urlpatterns = [
     path('v1/search', import_export.search, name='search'),
     # Отчет в JSON
     path('v1/report/json', views.ReportViewSet.as_view({'get': 'export_json'}), name='report-json'),
+    # Явные пути для экспорта отчетов (для надежности)
+    path('report/export/', ReportExportView.as_view(), name='report-export-direct'),
     # Обратная совместимость со старыми путями
     path('import/departments/', import_export.ImportDepartmentsView.as_view(), name='import-departments-legacy'),
     path('import/streams/', import_export.ImportStreamsView.as_view(), name='import-streams-legacy'),
