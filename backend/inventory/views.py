@@ -45,6 +45,50 @@ class VMViewSet(viewsets.ModelViewSet):
     serializer_class = VMSerializer
 
 
+def sync_pool_tags(pool):
+    """
+    Синхронизировать теги всех ВМ в пуле: собрать все уникальные теги
+    из всех ВМ в пуле и обновить теги каждой ВМ этим объединённым набором.
+    """
+    pool_vms = PoolVM.objects.filter(pool=pool, removed_at__isnull=True).select_related('vm', 'vm__info_system')
+    if not pool_vms.exists():
+        return
+    
+    # Собрать все уникальные теги из всех ВМ в пуле
+    all_tags_set = set()
+    for pv in pool_vms:
+        vm = pv.vm
+        tags = vm.tags or []
+        for tag in tags:
+            if tag and isinstance(tag, str):
+                tag_upper = tag.strip().upper()
+                if tag_upper:
+                    all_tags_set.add(tag_upper)
+        
+        # Также добавить код ИС как обязательный тег
+        if vm.info_system and vm.info_system.code:
+            is_code = (vm.info_system.code or '').strip().upper().replace(' ', '_')
+            if is_code:
+                all_tags_set.add(is_code)
+    
+    # Преобразовать в отсортированный список (ОС теги первыми, затем остальные)
+    os_tags = ['LINUX', 'WINDOWS', 'MACOS']
+    result_tags = []
+    # Добавить ОС теги, которые есть в пуле
+    for os_tag in os_tags:
+        if os_tag in all_tags_set:
+            result_tags.append(os_tag)
+            all_tags_set.remove(os_tag)
+    # Добавить остальные теги (коды ИС и кастомные) в алфавитном порядке
+    result_tags.extend(sorted(all_tags_set))
+    
+    # Обновить теги каждой ВМ в пуле
+    for pv in pool_vms:
+        vm = pv.vm
+        vm.tags = result_tags.copy()
+        vm.save(update_fields=['tags'])
+
+
 class PoolViewSet(viewsets.ModelViewSet):
     queryset = Pool.objects.all()
     serializer_class = PoolSerializer
@@ -86,6 +130,8 @@ class PoolViewSet(viewsets.ModelViewSet):
         if not created and pv.removed_at:
             pv.removed_at = None
             pv.save()
+        # Синхронизировать теги всех ВМ в пуле
+        sync_pool_tags(pool)
         return Response({'status': 'ok', 'pool_vm_id': pv.id})
 
     @action(detail=True, methods=['post'], url_path='remove-vm/(?P<vm_id>[^/.]+)')
@@ -97,6 +143,8 @@ class PoolViewSet(viewsets.ModelViewSet):
             return Response({'error': 'ВМ не в пуле'}, status=status.HTTP_404_NOT_FOUND)
         pv.removed_at = timezone.now()
         pv.save()
+        # Синхронизировать теги всех ВМ в пуле после удаления
+        sync_pool_tags(pool)
         return Response({'status': 'ok'})
 
 

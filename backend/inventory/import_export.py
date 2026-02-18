@@ -340,6 +340,9 @@ class ImportPoolsView(APIView):
                 if not pv_created and pv.removed_at:
                     pv.removed_at = None
                     pv.save()
+            # Синхронизировать теги всех ВМ в пуле после добавления всех ВМ
+            from .views import sync_pool_tags
+            sync_pool_tags(pool)
         return Response({'created': len(created), 'updated': len(updated), 'ids': created + updated})
 
 
