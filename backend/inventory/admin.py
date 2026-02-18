@@ -4,7 +4,7 @@ from .models import Department, Stream, InfoSystem, VM, Pool, PoolVM
 
 @admin.register(Department)
 class DepartmentAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name')
+    list_display = ('id', 'name', 'short_name')
 
 
 @admin.register(Stream)
@@ -15,15 +15,15 @@ class StreamAdmin(admin.ModelAdmin):
 
 @admin.register(InfoSystem)
 class InfoSystemAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name', 'stream')
+    list_display = ('id', 'name', 'code', 'is_id', 'stream')
     list_filter = ('stream',)
 
 
 @admin.register(VM)
 class VMAdmin(admin.ModelAdmin):
-    list_display = ('fqdn', 'cpu', 'ram', 'disk', 'instance', 'info_system')
+    list_display = ('fqdn', 'ip', 'cpu', 'ram', 'disk', 'instance', 'info_system')
     list_filter = ('instance',)
-    search_fields = ('fqdn',)
+    search_fields = ('fqdn', 'ip')
 
 
 @admin.register(Pool)

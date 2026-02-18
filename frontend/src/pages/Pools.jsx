@@ -119,12 +119,20 @@ export default function Pools() {
         <div className="table-wrap" style={{ marginTop: '1rem' }}>
           <table>
             <thead>
-              <tr><th>Название</th><th>Создан</th><th></th></tr>
+              <tr><th>Название</th><th>Теги пула</th><th>Создан</th><th></th></tr>
             </thead>
             <tbody>
               {poolList.map((p) => (
                 <tr key={p.id}>
                   <td>{p.name}</td>
+                  <td>
+                    <div className="tags-row">
+                      {(p.pool_tags || []).map((t) => (
+                        <span key={t} className="badge">{t}</span>
+                      ))}
+                      {(!p.pool_tags || p.pool_tags.length === 0) && <span className="empty-hint">—</span>}
+                    </div>
+                  </td>
                   <td>{p.created_at ? new Date(p.created_at).toLocaleString() : '—'}</td>
                   <td>
                     <button className="btn btn-sm btn-secondary" onClick={() => openComposition(p)}>Состав</button>
@@ -155,9 +163,16 @@ export default function Pools() {
                     <li className="empty-hint">Нет доступных ВМ с подходящим instance</li>
                   ) : (
                     availableVms.map((vm) => (
-                      <li key={vm.id}>
-                        <span>{vm.fqdn} (instance {vm.instance})</span>
-                        <button type="button" className="btn btn-sm" onClick={() => addVm(vm.id)}>Добавить →</button>
+                      <li key={vm.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span>{vm.fqdn} (instance {vm.instance})</span>
+                          <button type="button" className="btn btn-sm" onClick={() => addVm(vm.id)}>Добавить →</button>
+                        </div>
+                        <div className="tags-row" style={{ fontSize: '0.8rem' }}>
+                          {(vm.tags || []).map((t) => (
+                            <span key={t} className="badge">{t}</span>
+                          ))}
+                        </div>
                       </li>
                     ))
                   )}
@@ -171,9 +186,18 @@ export default function Pools() {
                     <li className="empty-hint">Пул пуст</li>
                   ) : (
                     (poolDetail?.vms_in_pool || []).map((v) => (
-                      <li key={v.id}>
-                        <span>{v.fqdn}</span>
-                        <button type="button" className="btn btn-sm btn-danger" onClick={() => removeVm(v.id)}>Убрать</button>
+                      <li key={v.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span>{v.fqdn}</span>
+                          <button type="button" className="btn btn-sm btn-danger" onClick={() => removeVm(v.id)}>Убрать</button>
+                        </div>
+                        {poolDetail?.pool_tags && (
+                          <div className="tags-row" style={{ fontSize: '0.8rem' }}>
+                            {poolDetail.pool_tags.map((t) => (
+                              <span key={t} className="badge">{t}</span>
+                            ))}
+                          </div>
+                        )}
                       </li>
                     ))
                   )}

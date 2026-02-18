@@ -9,6 +9,7 @@ const OS_OPTIONS = [
 
 const defaultForm = {
   fqdn: '',
+  ip: '000.000.000.000',
   cpu: 1,
   ram: 1,
   disk: 10,
@@ -22,9 +23,11 @@ export default function VMs() {
   const [vms, setVms] = useState([])
   const [infoSystems, setInfoSystems] = useState([])
   const [editing, setEditing] = useState(null)
+  const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState(defaultForm)
   const [customInput, setCustomInput] = useState('')
   const [error, setError] = useState('')
+  const [ipWarning, setIpWarning] = useState('')
 
   const load = () => {
     api.vms.list().then((r) => setVms(r.results || r)).catch(() => setVms([]))
@@ -36,17 +39,66 @@ export default function VMs() {
   const list = Array.isArray(vms) ? vms : (vms.results || [])
 
   const buildTags = () => {
-    const isName = form.info_system
-      ? (infoSystems.find((is) => is.id === form.info_system)?.name || '').toUpperCase().replace(/\s/g, '_')
+    const isCode = form.info_system
+      ? (infoSystems.find((is) => is.id === form.info_system)?.code || '').toString().trim().toUpperCase().replace(/\s/g, '_')
       : ''
-    return [form.osTag, isName, ...form.customTags]
+    return [form.osTag, isCode, ...form.customTags]
+  }
+
+  const validateIP = (ip) => {
+    if (!ip || ip.trim() === '') {
+      return 'IP адрес обязателен.'
+    }
+    const ipPattern = /^(\d{1,3}\.){3}\d{1,3}$/
+    if (!ipPattern.test(ip)) {
+      return 'Неверный формат IP адреса. Ожидается формат: xxx.xxx.xxx.xxx'
+    }
+    if (ip === '000.000.000.000') {
+      return null // Значение по умолчанию допустимо
+    }
+    const parts = ip.split('.')
+    for (const part of parts) {
+      const num = parseInt(part, 10)
+      if (isNaN(num) || num < 0 || num > 255) {
+        return 'Каждый октет IP адреса должен быть от 0 до 255.'
+      }
+    }
+    return null
+  }
+
+  const checkIpDuplicate = async (ip) => {
+    if (!ip || ip === '000.000.000.000') {
+      setIpWarning('')
+      return
+    }
+    try {
+      const allVms = await api.vms.list()
+      const vmsList = Array.isArray(allVms) ? allVms : (allVms.results || [])
+      const duplicate = vmsList.find(vm => vm.ip === ip && (!editing || vm.id !== editing.id))
+      if (duplicate) {
+        setIpWarning(`ВМ с IP адресом ${ip} уже существует: ${duplicate.fqdn}`)
+      } else {
+        setIpWarning('')
+      }
+    } catch (_) {
+      setIpWarning('')
+    }
   }
 
   const handleSave = async (e) => {
     e.preventDefault()
     setError('')
+    setIpWarning('')
+    
+    const ipError = validateIP(form.ip)
+    if (ipError) {
+      setError(ipError)
+      return
+    }
+    
     const payload = {
       fqdn: form.fqdn.trim(),
+      ip: form.ip.trim(),
       cpu: Number(form.cpu) || 1,
       ram: Number(form.ram) || 1,
       disk: Number(form.disk) || 10,
@@ -61,20 +113,28 @@ export default function VMs() {
         await api.vms.create(payload)
       }
       setEditing(null)
+      setShowForm(false)
       setForm(defaultForm)
       setCustomInput('')
+      setIpWarning('')
       load()
     } catch (err) {
-      setError(err.body?.fqdn?.[0] || err.body?.tags?.[0] || err.body?.instance?.[0] || err.body?.detail || err.message || 'Ошибка')
+      const errorMsg = err.body?.ip?.[0] || err.body?.fqdn?.[0] || err.body?.tags?.[0] || err.body?.instance?.[0] || err.body?.detail || err.message || 'Ошибка'
+      setError(errorMsg)
+      if (err.body?.ip?.[0]) {
+        setIpWarning(err.body.ip[0])
+      }
     }
   }
 
   const startEdit = (vm) => {
     setEditing(vm)
+    setShowForm(true)
     const custom = (vm.tags || []).slice(2)
     const isId = vm.info_system || ''
     setForm({
       fqdn: vm.fqdn,
+      ip: vm.ip || '000.000.000.000',
       cpu: vm.cpu,
       ram: vm.ram,
       disk: vm.disk,
@@ -84,6 +144,8 @@ export default function VMs() {
       customTags: custom,
     })
     setCustomInput('')
+    setIpWarning('')
+    checkIpDuplicate(vm.ip || '000.000.000.000')
   }
 
   const addCustomTag = () => {
@@ -100,6 +162,17 @@ export default function VMs() {
     <>
       <h1 className="page-title">Виртуальные машины</h1>
 
+      {!showForm && (
+        <div className="card">
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <button type="button" className="btn" onClick={() => { setEditing(null); setForm(defaultForm); setCustomInput(''); setShowForm(true); }}>
+              Добавить ВМ
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showForm && (
       <div className="card">
         <h3 style={{ marginTop: 0 }}>{editing ? 'Редактировать ВМ' : 'Добавить ВМ'}</h3>
         <form onSubmit={handleSave}>
@@ -111,6 +184,20 @@ export default function VMs() {
               placeholder="p0ppor-agc001lk.inno.local"
               required
             />
+          </div>
+          <div className="form-group">
+            <label>IP адрес</label>
+            <input
+              value={form.ip}
+              onChange={(e) => {
+                const newIp = e.target.value
+                setForm((f) => ({ ...f, ip: newIp }))
+                checkIpDuplicate(newIp)
+              }}
+              placeholder="000.000.000.000"
+              required
+            />
+            {ipWarning && <p className="error-msg" style={{ marginTop: '0.25rem', fontSize: '0.9rem' }}>{ipWarning}</p>}
           </div>
           <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
             <div className="form-group">
@@ -142,7 +229,7 @@ export default function VMs() {
             >
               <option value="">— не выбрана —</option>
               {infoSystems.map((is) => (
-                <option key={is.id} value={is.id}>{is.name} ({is.stream_name})</option>
+                <option key={is.id} value={is.id}>{is.name}{is.code ? ` [${is.code}]` : ''} ({is.stream_name})</option>
               ))}
             </select>
           </div>
@@ -163,11 +250,11 @@ export default function VMs() {
             </div>
           </div>
           <div className="form-group">
-            <label>Тег ИС (авто)</label>
+            <label>Тег ИС (код, авто)</label>
             <input
               value={
                 form.info_system
-                  ? (infoSystems.find((is) => is.id === form.info_system)?.name || '').toUpperCase().replace(/\s/g, '_')
+                  ? (infoSystems.find((is) => is.id === form.info_system)?.code || '').toString().trim().toUpperCase().replace(/\s/g, '_') || '—'
                   : '—'
               }
               disabled
@@ -196,13 +283,12 @@ export default function VMs() {
           </div>
           {error && <p className="error-msg">{error}</p>}
           <button type="submit" className="btn">{editing ? 'Сохранить' : 'Создать'}</button>
-          {editing && (
-            <button type="button" className="btn btn-secondary" style={{ marginLeft: '0.5rem' }} onClick={() => { setEditing(null); setForm(defaultForm); }}>
-              Отмена
-            </button>
-          )}
+          <button type="button" className="btn btn-secondary" style={{ marginLeft: '0.5rem' }} onClick={() => { setEditing(null); setForm(defaultForm); setShowForm(false); }}>
+            Отмена
+          </button>
         </form>
       </div>
+      )}
 
       <div className="card">
         <div className="table-wrap">
@@ -210,6 +296,7 @@ export default function VMs() {
             <thead>
               <tr>
                 <th>FQDN</th>
+                <th>IP</th>
                 <th>CPU</th>
                 <th>RAM</th>
                 <th>Диск</th>
@@ -223,6 +310,7 @@ export default function VMs() {
               {list.map((vm) => (
                 <tr key={vm.id}>
                   <td>{vm.fqdn}</td>
+                  <td>{vm.ip || '000.000.000.000'}</td>
                   <td>{vm.cpu}</td>
                   <td>{vm.ram}</td>
                   <td>{vm.disk}</td>

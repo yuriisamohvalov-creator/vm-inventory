@@ -15,6 +15,7 @@ function App() {
             <NavLink to="/pools">Общие пулы</NavLink>
             <NavLink to="/reports">Отчеты</NavLink>
             <NavLink to="/admin">Администрирование</NavLink>
+            <a href="/swagger/" target="_blank" rel="noopener noreferrer">API Swagger</a>
           </nav>
         </aside>
         <main className="main">

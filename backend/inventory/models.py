@@ -3,6 +3,7 @@ from django.db import models
 
 class Department(models.Model):
     name = models.CharField(max_length=255)
+    short_name = models.CharField(max_length=255, blank=True, default='')
 
     class Meta:
         ordering = ['name']
@@ -24,6 +25,8 @@ class Stream(models.Model):
 
 class InfoSystem(models.Model):
     name = models.CharField(max_length=255)
+    code = models.CharField(max_length=255, blank=True, default='')
+    is_id = models.CharField(max_length=255, blank=True, default='')
     stream = models.ForeignKey(Stream, on_delete=models.PROTECT, related_name='info_systems')
 
     class Meta:
@@ -33,10 +36,10 @@ class InfoSystem(models.Model):
         return self.name
 
 
-def build_tags(os_tag, info_system_name, custom_tags):
-    """Build tags list: [OS, IS_NAME, ...custom in UPPER_CASE]."""
+def build_tags(os_tag, info_system_code, custom_tags):
+    """Build tags list: [OS, IS_CODE, ...custom in UPPER_CASE]."""
     tags = [os_tag.upper() if os_tag else 'LINUX']
-    tags.append((info_system_name or '').upper().replace(' ', '_'))
+    tags.append((info_system_code or '').strip().upper().replace(' ', '_'))
     for t in (custom_tags or []):
         tag = (t or '').strip().upper().replace(' ', '_')
         if tag and tag not in tags:
@@ -52,6 +55,7 @@ class VM(models.Model):
     ]
 
     fqdn = models.CharField(max_length=255, unique=True)
+    ip = models.CharField(max_length=15, default='000.000.000.000')
     cpu = models.PositiveIntegerField(default=1)
     ram = models.PositiveIntegerField(default=1)  # GB
     disk = models.PositiveIntegerField(default=10)  # GB
@@ -98,6 +102,7 @@ class PoolVM(models.Model):
     vm = models.ForeignKey(VM, on_delete=models.CASCADE, related_name='pool_vms')
     added_at = models.DateTimeField(auto_now_add=True)
     removed_at = models.DateTimeField(null=True, blank=True)
+    original_tags = models.JSONField(default=list, null=True, blank=True)  # Теги ВМ до добавления в пул
 
     class Meta:
         unique_together = [('pool', 'vm')]

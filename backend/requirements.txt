@@ -4,5 +4,7 @@ django-cors-headers>=4.3,<5
 psycopg2-binary>=2.9,<3
 gunicorn>=21,<23
 reportlab>=4.0,<5
+openpyxl>=3.1,<4
+drf-yasg>=1.21,<2
 # LDAP (optional): uncomment and install system deps in Dockerfile (libldap2-dev libsasl2-dev) when needed
 # python-ldap>=3.4
