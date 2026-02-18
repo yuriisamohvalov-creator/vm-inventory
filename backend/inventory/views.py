@@ -178,9 +178,18 @@ class PoolViewSet(viewsets.ModelViewSet):
         pv.removed_at = timezone.now()
         pv.save()
         
-        # Пересчитать теги пула (удалить тег ИС удаленной ВМ, если больше нет ВМ с этим тегом)
+        # Пересчитать теги пула (удалить тег ИС и кастомные теги удаленной ВМ, если больше нет ВМ с этими тегами)
         remaining_pool_vms = PoolVM.objects.filter(pool=pool, removed_at__isnull=True).select_related('vm', 'vm__info_system')
         if remaining_pool_vms.exists():
+            # Получить кастомные теги удаленной ВМ (из original_tags, все кроме первого и второго тега)
+            removed_custom_tags = set()
+            if pv.original_tags and len(pv.original_tags) > 2:
+                for tag in pv.original_tags[2:]:
+                    if tag and isinstance(tag, str):
+                        tag_upper = tag.strip().upper()
+                        if tag_upper:
+                            removed_custom_tags.add(tag_upper)
+            
             # Собрать все уникальные теги из оставшихся ВМ
             all_tags_set = set()
             for remaining_pv in remaining_pool_vms:
@@ -209,6 +218,26 @@ class PoolViewSet(viewsets.ModelViewSet):
             # Если нет других ВМ с этим кодом ИС, удалить тег из пула
             if removed_is_code and not has_removed_is_code and removed_is_code in all_tags_set:
                 all_tags_set.remove(removed_is_code)
+            
+            # Проверить кастомные теги удаленной ВМ
+            # Для каждого кастомного тега проверить, есть ли он в original_tags других ВМ в пуле
+            for custom_tag in removed_custom_tags:
+                has_custom_tag_in_other_vms = False
+                for remaining_pv in remaining_pool_vms:
+                    remaining_original_tags = remaining_pv.original_tags or []
+                    # Проверить, был ли этот кастомный тег в оригинальных тегах другой ВМ
+                    if len(remaining_original_tags) > 2:
+                        for orig_tag in remaining_original_tags[2:]:
+                            if orig_tag and isinstance(orig_tag, str):
+                                if orig_tag.strip().upper() == custom_tag:
+                                    has_custom_tag_in_other_vms = True
+                                    break
+                    if has_custom_tag_in_other_vms:
+                        break
+                
+                # Если кастомный тег не найден в original_tags других ВМ, удалить его из пула
+                if not has_custom_tag_in_other_vms and custom_tag in all_tags_set:
+                    all_tags_set.remove(custom_tag)
             
             # Преобразовать в отсортированный список
             os_tags = ['LINUX', 'WINDOWS', 'MACOS']
