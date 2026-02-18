@@ -73,5 +73,12 @@ export const api = {
       if (!res.ok) throw Object.assign(new Error(res.statusText), { status: res.status });
       return res.blob();
     },
+    /** Скачивание отчёта в XLSX (возвращает Blob). */
+    exportXlsx: async () => {
+      const url = `${API}/v1/report/xlsx`;
+      const res = await fetch(url, { credentials: 'same-origin' });
+      if (!res.ok) throw Object.assign(new Error(res.statusText), { status: res.status });
+      return res.blob();
+    },
   },
 };

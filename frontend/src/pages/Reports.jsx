@@ -27,6 +27,20 @@ export default function Reports() {
     setExportLoading(false)
   }
 
+  const downloadReportXlsx = async () => {
+    setExportLoading(true)
+    try {
+      const blob = await api.report.exportXlsx()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'vm-inventory-report.xlsx'
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (_) {}
+    setExportLoading(false)
+  }
+
   if (loading) return <p className="empty-hint">Загрузка…</p>
 
   return (
@@ -35,9 +49,14 @@ export default function Reports() {
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1rem' }}>
           <span>Иерархический отчет: Департамент → Стрим → ИС → ВМ</span>
-          <button className="btn" onClick={downloadReportPdf} disabled={exportLoading}>
-            {exportLoading ? 'Выгрузка…' : 'Выгрузить PDF'}
-          </button>
+          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+            <button className="btn" onClick={downloadReportPdf} disabled={exportLoading}>
+              {exportLoading ? 'Выгрузка…' : 'Выгрузить PDF'}
+            </button>
+            <button className="btn" onClick={downloadReportXlsx} disabled={exportLoading}>
+              {exportLoading ? 'Выгрузка…' : 'Выгрузить XLSX'}
+            </button>
+          </div>
         </div>
         <div className="report-tree">
           {data.map((dept) => (
