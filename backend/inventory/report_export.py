@@ -1,5 +1,5 @@
 """Отдельный APIView для экспорта отчетов."""
-from django.http import FileResponse
+from django.http import HttpResponse
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
@@ -21,17 +21,13 @@ class ReportExportView(APIView):
             return report_json_response()
         elif format_type == 'xlsx':
             buf = build_report_xlsx()
-            return FileResponse(
-                buf,
-                as_attachment=True,
-                filename='vm-inventory-report.xlsx',
-                content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            )
+            buf.seek(0)
+            response = HttpResponse(buf.read(), content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+            response['Content-Disposition'] = 'attachment; filename="vm-inventory-report.xlsx"'
+            return response
         else:  # pdf по умолчанию
             buf = build_report_pdf()
-            return FileResponse(
-                buf,
-                as_attachment=True,
-                filename='vm-inventory-report.pdf',
-                content_type='application/pdf',
-            )
+            buf.seek(0)
+            response = HttpResponse(buf.read(), content_type='application/pdf')
+            response['Content-Disposition'] = 'attachment; filename="vm-inventory-report.pdf"'
+            return response
