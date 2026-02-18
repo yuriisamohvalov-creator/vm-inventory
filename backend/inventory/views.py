@@ -553,29 +553,6 @@ class ReportViewSet(viewsets.ViewSet):
             })
         return Response(result)
 
-    @action(detail=False, methods=['get'], url_path='export')
-    def export(self, request):
-        """Выгрузка отчёта в различных форматах: pdf, xlsx, json."""
-        from django.http import HttpResponse
-        format_type = request.query_params.get('format', 'pdf').lower()
-        
-        if format_type == 'json':
-            from .import_export import report_json_response
-            return report_json_response()
-        elif format_type == 'xlsx':
-            from .report_xlsx import build_report_xlsx
-            buf = build_report_xlsx()
-            buf.seek(0)
-            response = HttpResponse(buf.read(), content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-            response['Content-Disposition'] = 'attachment; filename="vm-inventory-report.xlsx"'
-            return response
-        else:  # pdf по умолчанию
-            buf = build_report_pdf()
-            buf.seek(0)
-            response = HttpResponse(buf.read(), content_type='application/pdf')
-            response['Content-Disposition'] = 'attachment; filename="vm-inventory-report.pdf"'
-            return response
-
     @action(detail=False, methods=['get'], url_path='pdf')
     def pdf(self, request):
         """Export current report as PDF (legacy endpoint)."""
