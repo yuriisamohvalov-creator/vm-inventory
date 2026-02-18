@@ -3,8 +3,11 @@ djangorestframework==3.14.0
 django-cors-headers==4.3.1
 psycopg2-binary==2.9.9
 python-dotenv==1.0.0
-WeasyPrint==60.1  # Для генерации PDF
-pandas==2.1.3     # Для генерации Excel
-openpyxl==3.1.2   # Для работы с Excel
+WeasyPrint==60.1
+pandas==2.1.3
+openpyxl==3.1.2
+drf-yasg==1.21.7  # Добавлено для Swagger
+PyYAML==6.0.1     # Зависимость для drf-yasg
+coreapi==2.3.3    # Дополнительно для drf-yasg
 # LDAP (optional): uncomment and install system deps in Dockerfile (libldap2-dev libsasl2-dev) when needed
 # python-ldap>=3.4

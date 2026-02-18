@@ -15,11 +15,26 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    
+    # Third party apps
     'rest_framework',
     'corsheaders',
-    'drf_yasg',
+    'drf_yasg',  # Swagger документация
+    
+    # Local apps
     'inventory',
 ]
+
+# Настройки для drf_yasg (добавьте в конец файла)
+SWAGGER_SETTINGS = {
+    'SECURITY_DEFINITIONS': {
+        'Basic': {
+            'type': 'basic'
+        }
+    },
+    'USE_SESSION_AUTH': False,
+    'JSON_EDITOR': True,
+}
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
