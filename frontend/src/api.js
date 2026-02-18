@@ -67,5 +67,6 @@ export const api = {
   report: {
     list: () => request('/report/'),
     pdf: () => request('/report/pdf/'),
+    export: (format) => request(`/report/export/?format=${format}`),
   },
 };

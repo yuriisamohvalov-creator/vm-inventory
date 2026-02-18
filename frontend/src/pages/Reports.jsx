@@ -4,7 +4,8 @@ import { api } from '../api'
 export default function Reports() {
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(true)
-  const [pdfLoading, setPdfLoading] = useState(false)
+  const [exportLoading, setExportLoading] = useState(false)
+  const [exportFormat, setExportFormat] = useState('pdf')
 
   useEffect(() => {
     api.report.list()
@@ -13,18 +14,19 @@ export default function Reports() {
       .finally(() => setLoading(false))
   }, [])
 
-  const downloadPdf = async () => {
-    setPdfLoading(true)
+  const downloadReport = async (format) => {
+    setExportLoading(true)
     try {
-      const blob = await api.report.pdf()
+      const blob = await api.report.export(format)
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = 'vm-inventory-report.pdf'
+      const extensions = { pdf: 'pdf', xlsx: 'xlsx', json: 'json' }
+      a.download = `vm-inventory-report.${extensions[format] || 'pdf'}`
       a.click()
       URL.revokeObjectURL(url)
     } catch (_) {}
-    setPdfLoading(false)
+    setExportLoading(false)
   }
 
   if (loading) return <p className="empty-hint">Загрузка…</p>
@@ -33,11 +35,23 @@ export default function Reports() {
     <>
       <h1 className="page-title">Отчеты</h1>
       <div className="card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1rem' }}>
           <span>Иерархический отчет: Департамент → Стрим → ИС → ВМ</span>
-          <button className="btn" onClick={downloadPdf} disabled={pdfLoading}>
-            {pdfLoading ? 'Выгрузка…' : 'Выгрузить в PDF'}
-          </button>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <select
+              value={exportFormat}
+              onChange={(e) => setExportFormat(e.target.value)}
+              style={{ padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--bg-dark)', color: 'var(--text-primary)' }}
+              disabled={exportLoading}
+            >
+              <option value="pdf">PDF</option>
+              <option value="xlsx">XLSX</option>
+              <option value="json">JSON</option>
+            </select>
+            <button className="btn" onClick={() => downloadReport(exportFormat)} disabled={exportLoading}>
+              {exportLoading ? 'Выгрузка…' : `Выгрузить в ${exportFormat.toUpperCase()}`}
+            </button>
+          </div>
         </div>
         <div className="report-tree">
           {data.map((dept) => (

@@ -257,9 +257,35 @@ class ReportViewSet(viewsets.ViewSet):
             })
         return Response(result)
 
+    @action(detail=False, methods=['get'], url_path='export')
+    def export(self, request):
+        """Выгрузка отчёта в различных форматах: pdf, xlsx, json."""
+        format_type = request.query_params.get('format', 'pdf').lower()
+        
+        if format_type == 'json':
+            from .import_export import report_json_response
+            return report_json_response()
+        elif format_type == 'xlsx':
+            from .report_xlsx import build_report_xlsx
+            buf = build_report_xlsx()
+            return FileResponse(
+                buf,
+                as_attachment=True,
+                filename='vm-inventory-report.xlsx',
+                content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            )
+        else:  # pdf по умолчанию
+            buf = build_report_pdf()
+            return FileResponse(
+                buf,
+                as_attachment=True,
+                filename='vm-inventory-report.pdf',
+                content_type='application/pdf',
+            )
+
     @action(detail=False, methods=['get'], url_path='pdf')
     def pdf(self, request):
-        """Export current report as PDF."""
+        """Export current report as PDF (legacy endpoint)."""
         buf = build_report_pdf()
         return FileResponse(
             buf,
@@ -270,6 +296,6 @@ class ReportViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=['get'], url_path='export/json')
     def export_json(self, request):
-        """Выгрузка отчёта в виде JSON файла."""
+        """Выгрузка отчёта в виде JSON файла (legacy endpoint)."""
         from .import_export import report_json_response
         return report_json_response()
