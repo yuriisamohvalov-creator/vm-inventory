@@ -80,5 +80,12 @@ export const api = {
       if (!res.ok) throw Object.assign(new Error(res.statusText), { status: res.status });
       return res.blob();
     },
+    /** Скачивание отчёта в JSON (возвращает Blob). */
+    exportJson: async () => {
+      const url = `${API}/v1/report/json`;
+      const res = await fetch(url, { credentials: 'same-origin' });
+      if (!res.ok) throw Object.assign(new Error(res.statusText), { status: res.status });
+      return res.blob();
+    },
   },
 };

@@ -5,6 +5,7 @@ export default function Reports() {
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(true)
   const [exportLoading, setExportLoading] = useState(false)
+  const [selectedFormat, setSelectedFormat] = useState('pdf')
 
   useEffect(() => {
     api.report.list()
@@ -13,28 +14,25 @@ export default function Reports() {
       .finally(() => setLoading(false))
   }, [])
 
-  const downloadReportPdf = async () => {
+  const downloadReport = async () => {
     setExportLoading(true)
     try {
-      const blob = await api.report.exportPdf()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = 'vm-inventory-report.pdf'
-      a.click()
-      URL.revokeObjectURL(url)
-    } catch (_) {}
-    setExportLoading(false)
-  }
+      let blob, filename;
+      if (selectedFormat === 'pdf') {
+        blob = await api.report.exportPdf()
+        filename = 'vm-inventory-report.pdf'
+      } else if (selectedFormat === 'xlsx') {
+        blob = await api.report.exportXlsx()
+        filename = 'vm-inventory-report.xlsx'
+      } else if (selectedFormat === 'json') {
+        blob = await api.report.exportJson()
+        filename = 'vm-inventory-report.json'
+      }
 
-  const downloadReportXlsx = async () => {
-    setExportLoading(true)
-    try {
-      const blob = await api.report.exportXlsx()
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = 'vm-inventory-report.xlsx'
+      a.download = filename
       a.click()
       URL.revokeObjectURL(url)
     } catch (_) {}
@@ -49,12 +47,19 @@ export default function Reports() {
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1rem' }}>
           <span>Иерархический отчет: Департамент → Стрим → ИС → ВМ</span>
-          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-            <button className="btn" onClick={downloadReportPdf} disabled={exportLoading}>
-              {exportLoading ? 'Выгрузка…' : 'Выгрузить PDF'}
-            </button>
-            <button className="btn" onClick={downloadReportXlsx} disabled={exportLoading}>
-              {exportLoading ? 'Выгрузка…' : 'Выгрузить XLSX'}
+          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+            <select
+              value={selectedFormat}
+              onChange={(e) => setSelectedFormat(e.target.value)}
+              disabled={exportLoading}
+              style={{ padding: '8px 12px', borderRadius: '4px', border: '1px solid #ccc' }}
+            >
+              <option value="pdf">PDF</option>
+              <option value="xlsx">XLSX</option>
+              <option value="json">JSON</option>
+            </select>
+            <button className="btn" onClick={downloadReport} disabled={exportLoading}>
+              {exportLoading ? 'Выгрузка…' : 'Выгрузить отчет'}
             </button>
           </div>
         </div>
