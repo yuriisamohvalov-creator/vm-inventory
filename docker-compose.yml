@@ -31,11 +31,12 @@ services:
 
   frontend:
     build: ./frontend
-    volumes:
-      - frontend_dist:/app/dist
+    # Не монтируем volumes поверх собранных файлов
+    # Если есть volumes, закомментируйте их
+    # volumes:
+    #   - ./frontend/dist:/app/dist
     environment:
       VITE_API_URL: /api
-    restart: unless-stopped
 
   nginx:
     image: nginx:alpine
