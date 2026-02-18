@@ -416,6 +416,11 @@ class PoolViewSet(viewsets.ModelViewSet):
 
 
 class ReportViewSet(viewsets.ViewSet):
+    """
+    ViewSet для отчетов. Не требует queryset, так как данные собираются динамически.
+    """
+    queryset = None  # ViewSet не требует queryset, но DRF может его ожидать
+    
     def list(self, request):
         """Hierarchical report: Department -> Stream -> InfoSystem -> VMs with sums."""
         from django.db.models import Sum
