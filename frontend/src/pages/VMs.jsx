@@ -22,6 +22,7 @@ export default function VMs() {
   const [vms, setVms] = useState([])
   const [infoSystems, setInfoSystems] = useState([])
   const [editing, setEditing] = useState(null)
+  const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState(defaultForm)
   const [customInput, setCustomInput] = useState('')
   const [error, setError] = useState('')
@@ -61,6 +62,7 @@ export default function VMs() {
         await api.vms.create(payload)
       }
       setEditing(null)
+      setShowForm(false)
       setForm(defaultForm)
       setCustomInput('')
       load()
@@ -71,6 +73,7 @@ export default function VMs() {
 
   const startEdit = (vm) => {
     setEditing(vm)
+    setShowForm(true)
     const custom = (vm.tags || []).slice(2)
     const isId = vm.info_system || ''
     setForm({
@@ -100,6 +103,17 @@ export default function VMs() {
     <>
       <h1 className="page-title">Виртуальные машины</h1>
 
+      {!showForm && (
+        <div className="card">
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <button type="button" className="btn" onClick={() => { setEditing(null); setForm(defaultForm); setCustomInput(''); setShowForm(true); }}>
+              Добавить ВМ
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showForm && (
       <div className="card">
         <h3 style={{ marginTop: 0 }}>{editing ? 'Редактировать ВМ' : 'Добавить ВМ'}</h3>
         <form onSubmit={handleSave}>
@@ -196,13 +210,12 @@ export default function VMs() {
           </div>
           {error && <p className="error-msg">{error}</p>}
           <button type="submit" className="btn">{editing ? 'Сохранить' : 'Создать'}</button>
-          {editing && (
-            <button type="button" className="btn btn-secondary" style={{ marginLeft: '0.5rem' }} onClick={() => { setEditing(null); setForm(defaultForm); }}>
-              Отмена
-            </button>
-          )}
+          <button type="button" className="btn btn-secondary" style={{ marginLeft: '0.5rem' }} onClick={() => { setEditing(null); setForm(defaultForm); setShowForm(false); }}>
+            Отмена
+          </button>
         </form>
       </div>
+      )}
 
       <div className="card">
         <div className="table-wrap">

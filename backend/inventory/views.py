@@ -168,3 +168,9 @@ class ReportViewSet(viewsets.ViewSet):
             filename='vm-inventory-report.pdf',
             content_type='application/pdf',
         )
+
+    @action(detail=False, methods=['get'], url_path='export/json')
+    def export_json(self, request):
+        """Выгрузка отчёта в виде JSON файла."""
+        from .import_export import report_json_response
+        return report_json_response()
