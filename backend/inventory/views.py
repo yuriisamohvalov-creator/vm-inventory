@@ -41,15 +41,41 @@ class InfoSystemViewSet(viewsets.ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         """Поддержка массового создания и обработка stream_name/department_name."""
+        import json
+        
+        # Получаем сырые данные из тела запроса
         data = request.data
+        
+        # Если данные пришли как строка, пытаемся распарсить
+        if isinstance(data, str):
+            try:
+                data = json.loads(data)
+            except (json.JSONDecodeError, ValueError) as e:
+                return Response(
+                    {'error': f'Невалидный JSON: {str(e)}. Убедитесь, что данные отправляются как массив: [{{...}}, {{...}}]'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
         
         # Если передан массив, обрабатываем массовое создание
         if isinstance(data, list):
+            if len(data) == 0:
+                return Response(
+                    {'error': 'Массив не может быть пустым'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
             return self._bulk_create(data)
         
         # Если передан объект с stream_name/department_name, обрабатываем их
         if isinstance(data, dict) and ('stream_name' in data or 'department_name' in data):
-            data = self._resolve_stream_from_names(data.copy())
+            resolved_data = self._resolve_stream_from_names(data.copy())
+            # Создаем новый request с обновленными данными
+            request._full_data = resolved_data
+            # Используем стандартный метод создания с обновленными данными
+            serializer = self.get_serializer(data=resolved_data)
+            serializer.is_valid(raise_exception=True)
+            self.perform_create(serializer)
+            headers = self.get_success_headers(serializer.data)
+            return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
         
         return super().create(request, *args, **kwargs)
 
@@ -95,13 +121,17 @@ class InfoSystemViewSet(viewsets.ModelViewSet):
         """Массовое создание ИС."""
         from rest_framework.response import Response
         from rest_framework import status
-        from .import_export import _get_or_create_department, _get_or_create_stream
         
         created = []
         errors = []
         
         for idx, item in enumerate(data_list):
             try:
+                # Проверка, что item является словарем
+                if not isinstance(item, dict):
+                    errors.append({'index': idx, 'error': 'Элемент должен быть объектом JSON'})
+                    continue
+                
                 # Разрешить stream из stream_name/department_name
                 item = self._resolve_stream_from_names(item.copy())
                 
@@ -113,7 +143,7 @@ class InfoSystemViewSet(viewsets.ModelViewSet):
                 
                 stream_id = item.get('stream')
                 if not stream_id:
-                    errors.append({'index': idx, 'error': 'Поле stream обязательно'})
+                    errors.append({'index': idx, 'error': 'Поле stream обязательно (укажите stream ID или stream_name + department_name)'})
                     continue
                 
                 try:
@@ -143,6 +173,7 @@ class InfoSystemViewSet(viewsets.ModelViewSet):
                 created.append({
                     'id': isys.id,
                     'name': isys.name,
+                    'code': isys.code,
                     'created': created_flag
                 })
             except Exception as e:
