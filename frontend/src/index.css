@@ -254,7 +254,8 @@ tr:hover td {
 .report-tree .vm { margin-left: 4.5rem; color: var(--text-muted); font-size: 0.9rem; }
 
 .report-tree .vm-count { font-size: 0.85rem; color: var(--text-muted); margin-left: 0.5rem; }
-.report-tree .report-sums { font-size: 0.85rem; color: var(--accent-green); margin-left: 0.5rem; }
+.report-tree .report-sums { font-size: 0.85rem; color: var(--accent-green); margin-left: 0.5rem; font-weight: 600; }
+.report-tree .vm-details { font-size: 0.8rem; color: var(--text-muted); margin-left: 0.5rem; }
 
 .admin-tree { }
 .tree-node { margin-bottom: 0.25rem; }

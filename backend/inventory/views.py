@@ -157,31 +157,74 @@ class ReportViewSet(viewsets.ViewSet):
         ).all()
         result = []
         for dept in departments:
+            dept_vm_count = 0
+            dept_sum_cpu = 0
+            dept_sum_ram = 0
+            dept_sum_disk = 0
             dept_data = {'id': dept.id, 'name': dept.name, 'streams': []}
             for stream in dept.streams.all():
+                stream_vm_count = 0
+                stream_sum_cpu = 0
+                stream_sum_ram = 0
+                stream_sum_disk = 0
                 stream_data = {'id': stream.id, 'name': stream.name, 'info_systems': []}
                 for isys in stream.info_systems.all():
                     vms_qs = isys.vms.all()
-                    vms = list(vms_qs.values_list('fqdn', flat=True))
+                    vms_list = []
+                    for vm in vms_qs:
+                        vms_list.append({
+                            'fqdn': vm.fqdn,
+                            'cpu': vm.cpu,
+                            'ram': vm.ram,
+                            'disk': vm.disk,
+                        })
                     aggr = vms_qs.aggregate(
                         sum_cpu=Sum('cpu'),
                         sum_ram=Sum('ram'),
                         sum_disk=Sum('disk'),
                     )
+                    is_vm_count = len(vms_list)
+                    is_sum_cpu = aggr['sum_cpu'] or 0
+                    is_sum_ram = aggr['sum_ram'] or 0
+                    is_sum_disk = aggr['sum_disk'] or 0
                     stream_data['info_systems'].append({
                         'id': isys.id,
                         'name': isys.name,
-                        'vms': vms,
-                        'vm_count': len(vms),
-                        'sum_cpu': aggr['sum_cpu'] or 0,
-                        'sum_ram': aggr['sum_ram'] or 0,
-                        'sum_disk': aggr['sum_disk'] or 0,
+                        'vms': vms_list,
+                        'vm_count': is_vm_count,
+                        'sum_cpu': is_sum_cpu,
+                        'sum_ram': is_sum_ram,
+                        'sum_disk': is_sum_disk,
                     })
+                    stream_vm_count += is_vm_count
+                    stream_sum_cpu += is_sum_cpu
+                    stream_sum_ram += is_sum_ram
+                    stream_sum_disk += is_sum_disk
+                stream_data['vm_count'] = stream_vm_count
+                stream_data['sum_cpu'] = stream_sum_cpu
+                stream_data['sum_ram'] = stream_sum_ram
+                stream_data['sum_disk'] = stream_sum_disk
                 dept_data['streams'].append(stream_data)
+                dept_vm_count += stream_vm_count
+                dept_sum_cpu += stream_sum_cpu
+                dept_sum_ram += stream_sum_ram
+                dept_sum_disk += stream_sum_disk
+            dept_data['vm_count'] = dept_vm_count
+            dept_data['sum_cpu'] = dept_sum_cpu
+            dept_data['sum_ram'] = dept_sum_ram
+            dept_data['sum_disk'] = dept_sum_disk
             result.append(dept_data)
         # Orphan VMs (info_system deleted)
         orphan_vms = VM.objects.filter(info_system__isnull=True)
         if orphan_vms.exists():
+            orphan_list = []
+            for vm in orphan_vms:
+                orphan_list.append({
+                    'fqdn': vm.fqdn,
+                    'cpu': vm.cpu,
+                    'ram': vm.ram,
+                    'disk': vm.disk,
+                })
             aggr = orphan_vms.aggregate(
                 sum_cpu=Sum('cpu'),
                 sum_ram=Sum('ram'),
@@ -190,14 +233,22 @@ class ReportViewSet(viewsets.ViewSet):
             result.append({
                 'id': None,
                 'name': '(ВМ без ИС / удалённая ИС)',
+                'vm_count': len(orphan_list),
+                'sum_cpu': aggr['sum_cpu'] or 0,
+                'sum_ram': aggr['sum_ram'] or 0,
+                'sum_disk': aggr['sum_disk'] or 0,
                 'streams': [{
                     'id': None,
                     'name': '—',
+                    'vm_count': len(orphan_list),
+                    'sum_cpu': aggr['sum_cpu'] or 0,
+                    'sum_ram': aggr['sum_ram'] or 0,
+                    'sum_disk': aggr['sum_disk'] or 0,
                     'info_systems': [{
                         'id': None,
                         'name': '—',
-                        'vms': list(orphan_vms.values_list('fqdn', flat=True)),
-                        'vm_count': orphan_vms.count(),
+                        'vms': orphan_list,
+                        'vm_count': len(orphan_list),
                         'sum_cpu': aggr['sum_cpu'] or 0,
                         'sum_ram': aggr['sum_ram'] or 0,
                         'sum_disk': aggr['sum_disk'] or 0,

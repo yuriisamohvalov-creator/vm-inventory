@@ -100,9 +100,18 @@ class VMSerializer(serializers.ModelSerializer):
 
 
 class PoolSerializer(serializers.ModelSerializer):
+    pool_tags = serializers.SerializerMethodField()
+
     class Meta:
         model = Pool
-        fields = ['id', 'name', 'created_at']
+        fields = ['id', 'name', 'created_at', 'pool_tags']
+
+    def get_pool_tags(self, obj):
+        """Теги пула (из любой ВМ в пуле, они все одинаковые после синхронизации)."""
+        pv = obj.pool_vms.filter(removed_at__isnull=True).select_related('vm').first()
+        if pv and pv.vm:
+            return pv.vm.tags or []
+        return []
 
 
 class PoolVMSerializer(serializers.ModelSerializer):
@@ -117,10 +126,11 @@ class PoolVMSerializer(serializers.ModelSerializer):
 class PoolDetailSerializer(serializers.ModelSerializer):
     vms_in_pool = serializers.SerializerMethodField()
     instance_value = serializers.SerializerMethodField()
+    pool_tags = serializers.SerializerMethodField()
 
     class Meta:
         model = Pool
-        fields = ['id', 'name', 'created_at', 'vms_in_pool', 'instance_value']
+        fields = ['id', 'name', 'created_at', 'vms_in_pool', 'instance_value', 'pool_tags']
 
     def get_vms_in_pool(self, obj):
         qs = obj.pool_vms.filter(removed_at__isnull=True).select_related('vm')
@@ -128,3 +138,10 @@ class PoolDetailSerializer(serializers.ModelSerializer):
 
     def get_instance_value(self, obj):
         return obj.instance_value()
+
+    def get_pool_tags(self, obj):
+        """Теги пула (из любой ВМ в пуле, они все одинаковые после синхронизации)."""
+        pv = obj.pool_vms.filter(removed_at__isnull=True).select_related('vm').first()
+        if pv and pv.vm:
+            return pv.vm.tags or []
+        return []
