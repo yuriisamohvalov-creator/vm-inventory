@@ -55,6 +55,7 @@ class VM(models.Model):
     ]
 
     fqdn = models.CharField(max_length=255, unique=True)
+    ip = models.CharField(max_length=15, default='000.000.000.000')
     cpu = models.PositiveIntegerField(default=1)
     ram = models.PositiveIntegerField(default=1)  # GB
     disk = models.PositiveIntegerField(default=10)  # GB
@@ -101,6 +102,7 @@ class PoolVM(models.Model):
     vm = models.ForeignKey(VM, on_delete=models.CASCADE, related_name='pool_vms')
     added_at = models.DateTimeField(auto_now_add=True)
     removed_at = models.DateTimeField(null=True, blank=True)
+    original_tags = models.JSONField(default=list, null=True, blank=True)  # Теги ВМ до добавления в пул
 
     class Meta:
         unique_together = [('pool', 'vm')]

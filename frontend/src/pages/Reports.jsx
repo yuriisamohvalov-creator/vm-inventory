@@ -83,6 +83,9 @@ export default function Reports() {
                       {(isys.vms || []).map((vm, i) => (
                         <div key={i} className="vm">
                           • {typeof vm === 'string' ? vm : vm.fqdn}
+                          {typeof vm === 'object' && vm.ip && (
+                            <span className="vm-details"> ({vm.ip})</span>
+                          )}
                           {typeof vm === 'object' && vm.cpu !== undefined && (
                             <span className="vm-details"> (CPU: {vm.cpu}, RAM: {vm.ram} ГБ, Диск: {vm.disk} ГБ)</span>
                           )}

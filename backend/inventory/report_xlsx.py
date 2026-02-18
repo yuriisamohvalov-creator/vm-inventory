@@ -72,10 +72,11 @@ def build_report_xlsx():
                     
                     # Заголовки колонок ВМ
                     ws[f'D{row}'] = 'FQDN'
-                    ws[f'E{row}'] = 'CPU'
-                    ws[f'F{row}'] = 'RAM (ГБ)'
-                    ws[f'G{row}'] = 'Диск (ГБ)'
-                    for col in ['D', 'E', 'F', 'G']:
+                    ws[f'E{row}'] = 'IP'
+                    ws[f'F{row}'] = 'CPU'
+                    ws[f'G{row}'] = 'RAM (ГБ)'
+                    ws[f'H{row}'] = 'Диск (ГБ)'
+                    for col in ['D', 'E', 'F', 'G', 'H']:
                         ws[f'{col}{row}'].fill = header_fill
                         ws[f'{col}{row}'].font = header_font
                     row += 1
@@ -83,9 +84,10 @@ def build_report_xlsx():
                     # ВМ
                     for vm in vms_list:
                         ws[f'D{row}'] = vm.fqdn
-                        ws[f'E{row}'] = vm.cpu
-                        ws[f'F{row}'] = vm.ram
-                        ws[f'G{row}'] = vm.disk
+                        ws[f'E{row}'] = vm.ip
+                        ws[f'F{row}'] = vm.cpu
+                        ws[f'G{row}'] = vm.ram
+                        ws[f'H{row}'] = vm.disk
                         row += 1
                     
                     # Итого ИС
@@ -93,9 +95,9 @@ def build_report_xlsx():
                     sum_ram = sum(vm.ram for vm in vms_list)
                     sum_disk = sum(vm.disk for vm in vms_list)
                     ws[f'D{row}'] = f'Итого ИС: {len(vms_list)} ВМ'
-                    ws[f'E{row}'] = sum_cpu
-                    ws[f'F{row}'] = sum_ram
-                    ws[f'G{row}'] = sum_disk
+                    ws[f'F{row}'] = sum_cpu
+                    ws[f'G{row}'] = sum_ram
+                    ws[f'H{row}'] = sum_disk
                     ws[f'D{row}'].font = Font(bold=True)
                     row += 1
                     
@@ -107,9 +109,9 @@ def build_report_xlsx():
                 if stream_vm_count > 0:
                     # Итого Стрим
                     ws[f'C{row}'] = f'Итого Стрим: {stream_vm_count} ВМ'
-                    ws[f'E{row}'] = stream_sum_cpu
-                    ws[f'F{row}'] = stream_sum_ram
-                    ws[f'G{row}'] = stream_sum_disk
+                    ws[f'F{row}'] = stream_sum_cpu
+                    ws[f'G{row}'] = stream_sum_ram
+                    ws[f'H{row}'] = stream_sum_disk
                     ws[f'C{row}'].font = Font(bold=True)
                     ws[f'C{row}'].fill = stream_fill
                     row += 1
@@ -122,9 +124,9 @@ def build_report_xlsx():
         if dept_vm_count > 0:
             # Итого Департамент
             ws[f'A{row}'] = f'Итого Департамент: {dept_vm_count} ВМ'
-            ws[f'E{row}'] = dept_sum_cpu
-            ws[f'F{row}'] = dept_sum_ram
-            ws[f'G{row}'] = dept_sum_disk
+            ws[f'F{row}'] = dept_sum_cpu
+            ws[f'G{row}'] = dept_sum_ram
+            ws[f'H{row}'] = dept_sum_disk
             ws[f'A{row}'].font = Font(bold=True)
             ws[f'A{row}'].fill = dept_fill
             row += 1
@@ -139,28 +141,30 @@ def build_report_xlsx():
         row += 1
         
         ws[f'D{row}'] = 'FQDN'
-        ws[f'E{row}'] = 'CPU'
-        ws[f'F{row}'] = 'RAM (ГБ)'
-        ws[f'G{row}'] = 'Диск (ГБ)'
-        for col in ['D', 'E', 'F', 'G']:
+        ws[f'E{row}'] = 'IP'
+        ws[f'F{row}'] = 'CPU'
+        ws[f'G{row}'] = 'RAM (ГБ)'
+        ws[f'H{row}'] = 'Диск (ГБ)'
+        for col in ['D', 'E', 'F', 'G', 'H']:
             ws[f'{col}{row}'].fill = header_fill
             ws[f'{col}{row}'].font = header_font
         row += 1
         
         for vm in orphan_list:
             ws[f'D{row}'] = vm.fqdn
-            ws[f'E{row}'] = vm.cpu
-            ws[f'F{row}'] = vm.ram
-            ws[f'G{row}'] = vm.disk
+            ws[f'E{row}'] = vm.ip
+            ws[f'F{row}'] = vm.cpu
+            ws[f'G{row}'] = vm.ram
+            ws[f'H{row}'] = vm.disk
             row += 1
         
         sum_cpu = sum(vm.cpu for vm in orphan_list)
         sum_ram = sum(vm.ram for vm in orphan_list)
         sum_disk = sum(vm.disk for vm in orphan_list)
         ws[f'D{row}'] = f'Итого: {len(orphan_list)} ВМ'
-        ws[f'E{row}'] = sum_cpu
-        ws[f'F{row}'] = sum_ram
-        ws[f'G{row}'] = sum_disk
+        ws[f'F{row}'] = sum_cpu
+        ws[f'G{row}'] = sum_ram
+        ws[f'H{row}'] = sum_disk
         ws[f'D{row}'].font = Font(bold=True)
     
     # Автоподбор ширины колонок

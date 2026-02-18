@@ -21,9 +21,9 @@ class InfoSystemAdmin(admin.ModelAdmin):
 
 @admin.register(VM)
 class VMAdmin(admin.ModelAdmin):
-    list_display = ('fqdn', 'cpu', 'ram', 'disk', 'instance', 'info_system')
+    list_display = ('fqdn', 'ip', 'cpu', 'ram', 'disk', 'instance', 'info_system')
     list_filter = ('instance',)
-    search_fields = ('fqdn',)
+    search_fields = ('fqdn', 'ip')
 
 
 @admin.register(Pool)

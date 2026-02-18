@@ -45,14 +45,20 @@ class VMViewSet(viewsets.ModelViewSet):
     serializer_class = VMSerializer
 
 
-def sync_pool_tags(pool):
+def sync_pool_tags(pool, added_pv=None):
     """
     Синхронизировать теги всех ВМ в пуле: собрать все уникальные теги
     из всех ВМ в пуле и обновить теги каждой ВМ этим объединённым набором.
+    При первом добавлении ВМ сохраняем её оригинальные теги в original_tags.
     """
     pool_vms = PoolVM.objects.filter(pool=pool, removed_at__isnull=True).select_related('vm', 'vm__info_system')
     if not pool_vms.exists():
         return
+    
+    # Сохранить оригинальные теги для только что добавленной ВМ (если это первое добавление)
+    if added_pv and not added_pv.original_tags:
+        added_pv.original_tags = list(added_pv.vm.tags or [])
+        added_pv.save(update_fields=['original_tags'])
     
     # Собрать все уникальные теги из всех ВМ в пуле
     all_tags_set = set()
@@ -85,6 +91,10 @@ def sync_pool_tags(pool):
     # Обновить теги каждой ВМ в пуле
     for pv in pool_vms:
         vm = pv.vm
+        # Сохранить оригинальные теги при первом добавлении
+        if not pv.original_tags:
+            pv.original_tags = list(vm.tags or [])
+            pv.save(update_fields=['original_tags'])
         vm.tags = result_tags.copy()
         vm.save(update_fields=['tags'])
 
@@ -129,9 +139,13 @@ class PoolViewSet(viewsets.ModelViewSet):
         pv, created = PoolVM.objects.get_or_create(pool=pool, vm=vm, defaults={})
         if not created and pv.removed_at:
             pv.removed_at = None
+            # Если ВМ была удалена и снова добавлена, восстанавливаем оригинальные теги из сохраненных
+            if pv.original_tags:
+                vm.tags = list(pv.original_tags)
+                vm.save(update_fields=['tags'])
             pv.save()
-        # Синхронизировать теги всех ВМ в пуле
-        sync_pool_tags(pool)
+        # Синхронизировать теги всех ВМ в пуле (сохранит оригинальные теги для новой ВМ)
+        sync_pool_tags(pool, added_pv=pv if created else None)
         return Response({'status': 'ok', 'pool_vm_id': pv.id})
 
     @action(detail=True, methods=['post'], url_path='remove-vm/(?P<vm_id>[^/.]+)')
@@ -141,10 +155,76 @@ class PoolViewSet(viewsets.ModelViewSet):
         pv = PoolVM.objects.filter(pool=pool, vm_id=vm_id, removed_at__isnull=True).first()
         if not pv:
             return Response({'error': 'ВМ не в пуле'}, status=status.HTTP_404_NOT_FOUND)
+        
+        vm = pv.vm
+        removed_is_code = None
+        if vm.info_system and vm.info_system.code:
+            removed_is_code = (vm.info_system.code or '').strip().upper().replace(' ', '_')
+        
+        # Восстановить оригинальные теги ВМ
+        if pv.original_tags:
+            vm.tags = list(pv.original_tags)
+        else:
+            # Если оригинальные теги не сохранены, оставляем только первый тег (ОС) и второй (код ИС этой ВМ)
+            current_tags = vm.tags or []
+            if len(current_tags) >= 1:
+                os_tag = current_tags[0]
+                is_code = removed_is_code if removed_is_code else (current_tags[1] if len(current_tags) > 1 else '')
+                vm.tags = [os_tag] + ([is_code] if is_code else [])
+            else:
+                vm.tags = ['LINUX']
+        vm.save(update_fields=['tags'])
+        
         pv.removed_at = timezone.now()
         pv.save()
-        # Синхронизировать теги всех ВМ в пуле после удаления
-        sync_pool_tags(pool)
+        
+        # Пересчитать теги пула (удалить тег ИС удаленной ВМ, если больше нет ВМ с этим тегом)
+        remaining_pool_vms = PoolVM.objects.filter(pool=pool, removed_at__isnull=True).select_related('vm', 'vm__info_system')
+        if remaining_pool_vms.exists():
+            # Собрать все уникальные теги из оставшихся ВМ
+            all_tags_set = set()
+            for remaining_pv in remaining_pool_vms:
+                remaining_vm = remaining_pv.vm
+                tags = remaining_vm.tags or []
+                for tag in tags:
+                    if tag and isinstance(tag, str):
+                        tag_upper = tag.strip().upper()
+                        if tag_upper:
+                            all_tags_set.add(tag_upper)
+                if remaining_vm.info_system and remaining_vm.info_system.code:
+                    is_code = (remaining_vm.info_system.code or '').strip().upper().replace(' ', '_')
+                    if is_code:
+                        all_tags_set.add(is_code)
+            
+            # Проверить, есть ли еще ВМ с кодом ИС удаленной ВМ
+            has_removed_is_code = False
+            if removed_is_code:
+                for remaining_pv in remaining_pool_vms:
+                    remaining_vm = remaining_pv.vm
+                    if remaining_vm.info_system and remaining_vm.info_system.code:
+                        if (remaining_vm.info_system.code or '').strip().upper().replace(' ', '_') == removed_is_code:
+                            has_removed_is_code = True
+                            break
+            
+            # Если нет других ВМ с этим кодом ИС, удалить тег из пула
+            if removed_is_code and not has_removed_is_code and removed_is_code in all_tags_set:
+                all_tags_set.remove(removed_is_code)
+            
+            # Преобразовать в отсортированный список
+            os_tags = ['LINUX', 'WINDOWS', 'MACOS']
+            result_tags = []
+            for os_tag in os_tags:
+                if os_tag in all_tags_set:
+                    result_tags.append(os_tag)
+                    all_tags_set.remove(os_tag)
+            result_tags.extend(sorted(all_tags_set))
+            
+            # Обновить теги всех оставшихся ВМ в пуле
+            for remaining_pv in remaining_pool_vms:
+                remaining_vm = remaining_pv.vm
+                remaining_vm.tags = result_tags.copy()
+                remaining_vm.save(update_fields=['tags'])
+        
         return Response({'status': 'ok'})
 
 
@@ -174,6 +254,7 @@ class ReportViewSet(viewsets.ViewSet):
                     for vm in vms_qs:
                         vms_list.append({
                             'fqdn': vm.fqdn,
+                            'ip': vm.ip,
                             'cpu': vm.cpu,
                             'ram': vm.ram,
                             'disk': vm.disk,
@@ -221,6 +302,7 @@ class ReportViewSet(viewsets.ViewSet):
             for vm in orphan_vms:
                 orphan_list.append({
                     'fqdn': vm.fqdn,
+                    'ip': vm.ip,
                     'cpu': vm.cpu,
                     'ram': vm.ram,
                     'disk': vm.disk,

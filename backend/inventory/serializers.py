@@ -32,7 +32,7 @@ class VMSerializer(serializers.ModelSerializer):
     class Meta:
         model = VM
         fields = [
-            'id', 'fqdn', 'cpu', 'ram', 'disk', 'instance', 'tags',
+            'id', 'fqdn', 'ip', 'cpu', 'ram', 'disk', 'instance', 'tags',
             'info_system', 'info_system_name', 'info_system_code'
         ]
 
@@ -47,6 +47,40 @@ class VMSerializer(serializers.ModelSerializer):
         if not value:
             raise serializers.ValidationError('FQDN обязателен.')
         return value
+
+    def validate_ip(self, value):
+        import re
+        value = (value or '').strip()
+        if not value:
+            raise serializers.ValidationError('IP адрес обязателен.')
+        # Проверка формата IP (простая проверка на формат xxx.xxx.xxx.xxx)
+        ip_pattern = r'^(\d{1,3}\.){3}\d{1,3}$'
+        if not re.match(ip_pattern, value):
+            raise serializers.ValidationError('Неверный формат IP адреса. Ожидается формат: xxx.xxx.xxx.xxx')
+        # Проверка на значение по умолчанию
+        if value == '000.000.000.000':
+            return value
+        # Проверка диапазонов октетов
+        parts = value.split('.')
+        for part in parts:
+            num = int(part)
+            if num < 0 or num > 255:
+                raise serializers.ValidationError('Каждый октет IP адреса должен быть от 0 до 255.')
+        return value
+
+    def validate(self, attrs):
+        # Проверка на дубликаты IP (кроме текущей ВМ при редактировании)
+        ip_value = attrs.get('ip')
+        if ip_value and ip_value != '000.000.000.000':
+            instance = self.instance
+            qs = VM.objects.filter(ip=ip_value)
+            if instance:
+                qs = qs.exclude(pk=instance.pk)
+            if qs.exists():
+                raise serializers.ValidationError({
+                    'ip': f'ВМ с IP адресом {ip_value} уже существует: {qs.first().fqdn}'
+                })
+        return super().validate(attrs)
 
     def validate_instance(self, value):
         if value is None or value < 1 or value > 20:

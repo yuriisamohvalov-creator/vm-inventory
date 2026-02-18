@@ -284,6 +284,7 @@ class ImportVMsView(APIView):
             tags = _vm_tags_from_item(item, info_system)
             payload = {
                 'fqdn': fqdn,
+                'ip': (item.get('ip') or '000.000.000.000').strip(),
                 'cpu': int(item.get('cpu') or 1),
                 'ram': int(item.get('ram') or 1),
                 'disk': int(item.get('disk') or 10),
@@ -294,6 +295,7 @@ class ImportVMsView(APIView):
             vm, created_flag = VM.objects.update_or_create(
                 fqdn=fqdn,
                 defaults={
+                    'ip': payload['ip'],
                     'cpu': payload['cpu'],
                     'ram': payload['ram'],
                     'disk': payload['disk'],
@@ -326,6 +328,7 @@ class ImportPoolsView(APIView):
             (created if created_flag else updated).append(pool.id)
             fqdns = item.get('vm_fqdns') or item.get('vms') or []
             instance_val = pool.instance_value()
+            added_pvs = []
             for fqdn in fqdns:
                 fqdn = (fqdn or '').strip()
                 if not fqdn:
@@ -339,7 +342,17 @@ class ImportPoolsView(APIView):
                 pv, pv_created = PoolVM.objects.get_or_create(pool=pool, vm=vm, defaults={})
                 if not pv_created and pv.removed_at:
                     pv.removed_at = None
+                    # Если ВМ была удалена и снова добавлена, восстанавливаем оригинальные теги из сохраненных
+                    if pv.original_tags:
+                        vm.tags = list(pv.original_tags)
+                        vm.save(update_fields=['tags'])
                     pv.save()
+                added_pvs.append((pv, pv_created))
+            # Сохранить оригинальные теги для всех новых ВМ перед синхронизацией
+            for pv, pv_created in added_pvs:
+                if not pv.original_tags:
+                    pv.original_tags = list(pv.vm.tags or [])
+                    pv.save(update_fields=['original_tags'])
             # Синхронизировать теги всех ВМ в пуле после добавления всех ВМ
             from .views import sync_pool_tags
             sync_pool_tags(pool)
@@ -404,6 +417,7 @@ def report_json_response():
                 for vm in vms_qs:
                     vms_list.append({
                         'fqdn': vm.fqdn,
+                        'ip': vm.ip,
                         'cpu': vm.cpu,
                         'ram': vm.ram,
                         'disk': vm.disk,
@@ -448,6 +462,7 @@ def report_json_response():
         for vm in orphan_vms:
             orphan_list.append({
                 'fqdn': vm.fqdn,
+                'ip': vm.ip,
                 'cpu': vm.cpu,
                 'ram': vm.ram,
                 'disk': vm.disk,

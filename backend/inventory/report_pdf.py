@@ -105,7 +105,7 @@ def build_report_pdf():
                         c.showPage()
                         y = height - 2 * cm
                     c.setFont(font_normal, 9)
-                    c.drawString(5 * cm, y, "  • %s (CPU: %d, RAM: %d ГБ, Диск: %d ГБ)" % (vm.fqdn, vm.cpu, vm.ram, vm.disk))
+                    c.drawString(5 * cm, y, "  • %s (%s) (CPU: %d, RAM: %d ГБ, Диск: %d ГБ)" % (vm.fqdn, vm.ip, vm.cpu, vm.ram, vm.disk))
                     y -= 0.4 * cm
                 if vms_list:
                     sum_cpu = sum(vm.cpu for vm in vms_list)
@@ -159,7 +159,7 @@ def build_report_pdf():
                 c.showPage()
                 y = height - 2 * cm
             c.setFont(font_normal, 9)
-            c.drawString(3 * cm, y, "  • %s (CPU: %d, RAM: %d ГБ, Диск: %d ГБ)" % (vm.fqdn, vm.cpu, vm.ram, vm.disk))
+            c.drawString(3 * cm, y, "  • %s (%s) (CPU: %d, RAM: %d ГБ, Диск: %d ГБ)" % (vm.fqdn, vm.ip, vm.cpu, vm.ram, vm.disk))
             y -= 0.4 * cm
         sum_cpu = sum(vm.cpu for vm in orphan_list)
         sum_ram = sum(vm.ram for vm in orphan_list)
