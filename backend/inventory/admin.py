@@ -15,7 +15,7 @@ class StreamAdmin(admin.ModelAdmin):
 
 @admin.register(InfoSystem)
 class InfoSystemAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name', 'code', 'stream')
+    list_display = ('id', 'name', 'code', 'is_id', 'stream')
     list_filter = ('stream',)
 
 

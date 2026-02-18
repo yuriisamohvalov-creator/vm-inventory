@@ -22,7 +22,7 @@ class InfoSystemSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = InfoSystem
-        fields = ['id', 'name', 'code', 'stream', 'stream_name', 'department_name']
+        fields = ['id', 'name', 'code', 'is_id', 'stream', 'stream_name', 'department_name']
 
 
 class VMSerializer(serializers.ModelSerializer):

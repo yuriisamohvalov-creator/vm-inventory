@@ -34,12 +34,24 @@ def build_report_pdf():
                 c.setFont("Helvetica", 10)
                 c.drawString(4 * cm, y, "  %s" % isys.name)
                 y -= 0.5 * cm
-                for vm in isys.vms.all():
+                vms_list = list(isys.vms.all())
+                for vm in vms_list:
                     if y < 2 * cm:
                         c.showPage()
                         y = height - 2 * cm
                     c.drawString(5 * cm, y, "  • %s" % vm.fqdn)
                     y -= 0.4 * cm
+                if vms_list:
+                    sum_cpu = sum(vm.cpu for vm in vms_list)
+                    sum_ram = sum(vm.ram for vm in vms_list)
+                    sum_disk = sum(vm.disk for vm in vms_list)
+                    tot = "  Итого: %d ВМ, CPU: %d, RAM: %d ГБ, Диск: %d ГБ" % (len(vms_list), sum_cpu, sum_ram, sum_disk)
+                    if y < 2 * cm:
+                        c.showPage()
+                        y = height - 2 * cm
+                    c.setFont("Helvetica-Bold", 9)
+                    c.drawString(5 * cm, y, tot)
+                    y -= 0.5 * cm
                 y -= 0.2 * cm
             y -= 0.2 * cm
         y -= 0.3 * cm
@@ -51,13 +63,24 @@ def build_report_pdf():
         c.setFont("Helvetica-Bold", 11)
         c.drawString(2 * cm, y, "(VM without IS / deleted IS)")
         y -= 0.6 * cm
-        for vm in orphan:
+        orphan_list = list(orphan)
+        for vm in orphan_list:
             if y < 2 * cm:
                 c.showPage()
                 y = height - 2 * cm
             c.setFont("Helvetica", 10)
             c.drawString(3 * cm, y, "  • %s" % vm.fqdn)
             y -= 0.4 * cm
+        sum_cpu = sum(vm.cpu for vm in orphan_list)
+        sum_ram = sum(vm.ram for vm in orphan_list)
+        sum_disk = sum(vm.disk for vm in orphan_list)
+        tot = "  Итого: %d ВМ, CPU: %d, RAM: %d ГБ, Диск: %d ГБ" % (len(orphan_list), sum_cpu, sum_ram, sum_disk)
+        if y < 2 * cm:
+            c.showPage()
+            y = height - 2 * cm
+        c.setFont("Helvetica-Bold", 9)
+        c.drawString(3 * cm, y, tot)
+        y -= 0.5 * cm
 
     c.save()
     buf.seek(0)

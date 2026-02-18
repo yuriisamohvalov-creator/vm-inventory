@@ -102,7 +102,8 @@ class PoolViewSet(viewsets.ModelViewSet):
 
 class ReportViewSet(viewsets.ViewSet):
     def list(self, request):
-        """Hierarchical report: Department -> Stream -> InfoSystem -> VMs."""
+        """Hierarchical report: Department -> Stream -> InfoSystem -> VMs with sums."""
+        from django.db.models import Sum
         departments = Department.objects.prefetch_related(
             'streams__info_systems__vms'
         ).all()
@@ -112,18 +113,32 @@ class ReportViewSet(viewsets.ViewSet):
             for stream in dept.streams.all():
                 stream_data = {'id': stream.id, 'name': stream.name, 'info_systems': []}
                 for isys in stream.info_systems.all():
-                    vms = list(isys.vms.values_list('fqdn', flat=True))
+                    vms_qs = isys.vms.all()
+                    vms = list(vms_qs.values_list('fqdn', flat=True))
+                    aggr = vms_qs.aggregate(
+                        sum_cpu=Sum('cpu'),
+                        sum_ram=Sum('ram'),
+                        sum_disk=Sum('disk'),
+                    )
                     stream_data['info_systems'].append({
                         'id': isys.id,
                         'name': isys.name,
                         'vms': vms,
                         'vm_count': len(vms),
+                        'sum_cpu': aggr['sum_cpu'] or 0,
+                        'sum_ram': aggr['sum_ram'] or 0,
+                        'sum_disk': aggr['sum_disk'] or 0,
                     })
                 dept_data['streams'].append(stream_data)
             result.append(dept_data)
         # Orphan VMs (info_system deleted)
         orphan_vms = VM.objects.filter(info_system__isnull=True)
         if orphan_vms.exists():
+            aggr = orphan_vms.aggregate(
+                sum_cpu=Sum('cpu'),
+                sum_ram=Sum('ram'),
+                sum_disk=Sum('disk'),
+            )
             result.append({
                 'id': None,
                 'name': '(ВМ без ИС / удалённая ИС)',
@@ -135,6 +150,9 @@ class ReportViewSet(viewsets.ViewSet):
                         'name': '—',
                         'vms': list(orphan_vms.values_list('fqdn', flat=True)),
                         'vm_count': orphan_vms.count(),
+                        'sum_cpu': aggr['sum_cpu'] or 0,
+                        'sum_ram': aggr['sum_ram'] or 0,
+                        'sum_disk': aggr['sum_disk'] or 0,
                     }],
                 }],
             })

@@ -26,6 +26,7 @@ class Stream(models.Model):
 class InfoSystem(models.Model):
     name = models.CharField(max_length=255)
     code = models.CharField(max_length=255, blank=True, default='')
+    is_id = models.CharField(max_length=255, blank=True, default='')
     stream = models.ForeignKey(Stream, on_delete=models.PROTECT, related_name='info_systems')
 
     class Meta:

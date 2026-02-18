@@ -55,6 +55,11 @@ export default function Reports() {
                       {(isys.vms || []).map((fqdn, i) => (
                         <div key={i} className="vm">• {fqdn}</div>
                       ))}
+                      {(isys.vm_count > 0 || isys.sum_cpu !== undefined) && (
+                        <div className="vm report-sums">
+                          Итого: {isys.vm_count ?? 0} ВМ, CPU: {isys.sum_cpu ?? 0}, RAM: {isys.sum_ram ?? 0} ГБ, Диск: {isys.sum_disk ?? 0} ГБ
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
