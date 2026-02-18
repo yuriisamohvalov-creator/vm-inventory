@@ -1,116 +1,237 @@
-import { useState, useEffect } from 'react'
-import { api } from '../api'
+import React, { useState, useEffect } from 'react';
+import {
+  Box,
+  Typography,
+  Button,
+  Paper,
+  CircularProgress,
+  Alert,
+  ButtonGroup,
+  Snackbar
+} from '@mui/material';
+import {
+  PictureAsPdf as PdfIcon,
+  TableChart as ExcelIcon,
+  Code as JsonIcon
+} from '@mui/icons-material';
+import api from '../services/api';
+import ReportTree from '../components/ReportTree';
 
-export default function Reports() {
-  const [data, setData] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [exportLoading, setExportLoading] = useState(false)
-  const [exportFormat, setExportFormat] = useState('pdf')
+const Reports = () => {
+  const [reportData, setReportData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [exportLoading, setExportLoading] = useState(false);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
 
   useEffect(() => {
-    api.report.list()
-      .then((r) => setData(Array.isArray(r) ? r : (r.results || [])))
-      .catch(() => setData([]))
-      .finally(() => setLoading(false))
-  }, [])
+    fetchReportData();
+  }, []);
 
-  const downloadReport = async (format) => {
-    setExportLoading(true)
+  const fetchReportData = async () => {
     try {
-      const blob = await api.report.export(format)
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      const extensions = { pdf: 'pdf', xlsx: 'xlsx', json: 'json' }
-      a.download = `vm-inventory-report.${extensions[format] || 'pdf'}`
-      a.click()
-      URL.revokeObjectURL(url)
-    } catch (_) {}
-    setExportLoading(false)
+      setLoading(true);
+      const response = await api.get('/report/');
+      setReportData(response.data);
+      setError(null);
+    } catch (err) {
+      setError('Failed to load report data');
+      console.error('Error loading report:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleExport = async (format) => {
+    setExportLoading(true);
+    setSnackbar({ open: false, message: '', severity: 'info' });
+    
+    try {
+      // Определяем URL и имя файла
+      let url = `/report/${format}/`;
+      let filename = `vm_report.${format === 'xlsx' ? 'xlsx' : format}`;
+      
+      console.log(`Exporting to ${format} from ${url}`);
+      
+      // Важно: указываем responseType: 'blob' для получения бинарных данных
+      const response = await api.get(url, {
+        responseType: 'blob',
+        // Добавляем заголовок для правильной обработки
+        headers: {
+          'Accept': format === 'json' 
+            ? 'application/json' 
+            : format === 'pdf' 
+              ? 'application/pdf' 
+              : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        }
+      });
+
+      console.log('Response received:', response);
+
+      // Проверяем, что ответ действительно содержит данные
+      if (!response.data || response.data.size === 0) {
+        throw new Error('Empty response received');
+      }
+
+      // Создаем blob из полученных данных
+      const blob = new Blob([response.data], { 
+        type: response.headers['content-type'] || 
+              (format === 'json' ? 'application/json' : 
+               format === 'pdf' ? 'application/pdf' : 
+               'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+      });
+      
+      // Создаем ссылку для скачивания
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.setAttribute('download', filename);
+      
+      // Добавляем ссылку в DOM, кликаем и удаляем
+      document.body.appendChild(link);
+      link.click();
+      
+      // Очищаем
+      setTimeout(() => {
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(downloadUrl);
+      }, 100);
+
+      setSnackbar({
+        open: true,
+        message: `Report exported as ${format.toUpperCase()}`,
+        severity: 'success'
+      });
+
+    } catch (err) {
+      console.error(`Export to ${format} failed:`, err);
+      
+      // Пытаемся прочитать ошибку из ответа, если это JSON
+      if (err.response && err.response.data instanceof Blob) {
+        const text = await err.response.data.text();
+        try {
+          const errorData = JSON.parse(text);
+          setSnackbar({
+            open: true,
+            message: `Export failed: ${errorData.detail || errorData.message || 'Unknown error'}`,
+            severity: 'error'
+          });
+        } catch {
+          setSnackbar({
+            open: true,
+            message: `Export failed: Server error (${err.response.status})`,
+            severity: 'error'
+          });
+        }
+      } else {
+        setSnackbar({
+          open: true,
+          message: `Export failed: ${err.message || 'Network error'}`,
+          severity: 'error'
+        });
+      }
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
+  const handleCloseSnackbar = () => {
+    setSnackbar({ ...snackbar, open: false });
+  };
+
+  if (loading) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+        <CircularProgress />
+      </Box>
+    );
   }
 
-  if (loading) return <p className="empty-hint">Загрузка…</p>
-
   return (
-    <>
-      <h1 className="page-title">Отчеты</h1>
-      <div className="card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1rem' }}>
-          <span>Иерархический отчет: Департамент → Стрим → ИС → ВМ</span>
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-            <select
-              value={exportFormat}
-              onChange={(e) => setExportFormat(e.target.value)}
-              style={{ padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--bg-dark)', color: 'var(--text-primary)' }}
-              disabled={exportLoading}
-            >
-              <option value="pdf">PDF</option>
-              <option value="xlsx">XLSX</option>
-              <option value="json">JSON</option>
-            </select>
-            <button className="btn" onClick={() => downloadReport(exportFormat)} disabled={exportLoading}>
-              {exportLoading ? 'Выгрузка…' : `Выгрузить в ${exportFormat.toUpperCase()}`}
-            </button>
-          </div>
-        </div>
-        <div className="report-tree">
-          {data.map((dept) => (
-            <div key={dept.id ?? 'orphan'}>
-              <div className="dept">
-                {dept.has_exceeded && '🚨 '}
-                {dept.name}
-                {(dept.vm_count !== undefined) && (
-                  <span className="vm-count report-sums">
-                    (ВМ: {dept.vm_count}, CPU: {dept.sum_cpu ?? 0}
-                    {dept.cpu_quota > 0 ? `/${dept.cpu_quota}` : ''}, RAM: {dept.sum_ram ?? 0}
-                    {dept.ram_quota > 0 ? `/${dept.ram_quota}` : ''} ГБ, Диск: {dept.sum_disk ?? 0}
-                    {dept.disk_quota > 0 ? `/${dept.disk_quota}` : ''} ГБ)
-                  </span>
-                )}
-              </div>
-              {(dept.streams || []).map((stream) => (
-                <div key={stream.id ?? 's'}>
-                  <div className="stream">
-                    {stream.name}
-                    {(stream.vm_count !== undefined) && (
-                      <span className="vm-count report-sums">
-                        ({stream.vm_count} ВМ, CPU: {stream.sum_cpu ?? 0}, RAM: {stream.sum_ram ?? 0} ГБ, Диск: {stream.sum_disk ?? 0} ГБ)
-                      </span>
-                    )}
-                  </div>
-                  {(stream.info_systems || []).map((isys) => (
-                    <div key={isys.id ?? 'is'}>
-                      <div className="is">
-                        {isys.name}
-                        <span className="vm-count">({isys.vm_count ?? (isys.vms?.length ?? 0)} ВМ)</span>
-                      </div>
-                      {(isys.vms || []).map((vm, i) => (
-                        <div key={i} className="vm">
-                          • {typeof vm === 'string' ? vm : vm.fqdn}
-                          {typeof vm === 'object' && vm.info_system_deleted && (
-                            <span className="vm-details" style={{ color: '#f44336', fontWeight: 'bold' }}> [ИС УДАЛЕНА]</span>
-                          )}
-                          {typeof vm === 'object' && vm.ip && (
-                            <span className="vm-details"> (IP: {vm.ip})</span>
-                          )}
-                          {typeof vm === 'object' && vm.cpu !== undefined && (
-                            <span className="vm-details"> (CPU: {vm.cpu}, RAM: {vm.ram} ГБ, Диск: {vm.disk} ГБ)</span>
-                          )}
-                        </div>
-                      ))}
-                      {(isys.vm_count > 0 || isys.sum_cpu !== undefined) && (
-                        <div className="vm report-sums">
-                          Итого ИС: {isys.vm_count ?? 0} ВМ, CPU: {isys.sum_cpu ?? 0}, RAM: {isys.sum_ram ?? 0} ГБ, Диск: {isys.sum_disk ?? 0} ГБ
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </div>
-          ))}
-        </div>
-      </div>
-    </>
-  )
-}
+    <Box>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+        <Typography variant="h4" component="h1">
+          VM Inventory Report
+        </Typography>
+        
+        <ButtonGroup variant="contained" aria-label="export buttons" disabled={exportLoading}>
+          <Button
+            onClick={() => handleExport('pdf')}
+            startIcon={<PdfIcon />}
+            disabled={exportLoading}
+            sx={{ 
+              bgcolor: '#dc3545', 
+              '&:hover': { bgcolor: '#c82333' },
+              '&.Mui-disabled': { bgcolor: '#dc3545', opacity: 0.5 }
+            }}
+          >
+            PDF
+          </Button>
+          <Button
+            onClick={() => handleExport('xlsx')}
+            startIcon={<ExcelIcon />}
+            disabled={exportLoading}
+            sx={{ 
+              bgcolor: '#28a745', 
+              '&:hover': { bgcolor: '#218838' },
+              '&.Mui-disabled': { bgcolor: '#28a745', opacity: 0.5 }
+            }}
+          >
+            Excel
+          </Button>
+          <Button
+            onClick={() => handleExport('json')}
+            startIcon={<JsonIcon />}
+            disabled={exportLoading}
+            sx={{ 
+              bgcolor: '#ffc107', 
+              color: '#000',
+              '&:hover': { bgcolor: '#e0a800' },
+              '&.Mui-disabled': { bgcolor: '#ffc107', opacity: 0.5 }
+            }}
+          >
+            JSON
+          </Button>
+        </ButtonGroup>
+      </Box>
+
+      {exportLoading && (
+        <Box display="flex" justifyContent="center" my={2}>
+          <CircularProgress size={24} />
+          <Typography variant="body2" sx={{ ml: 1 }}>
+            Generating export...
+          </Typography>
+        </Box>
+      )}
+
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+          {error}
+        </Alert>
+      )}
+
+      <Paper sx={{ p: 3 }}>
+        {reportData ? (
+          <ReportTree data={reportData} />
+        ) : (
+          <Typography color="text.secondary" align="center">
+            No data available
+          </Typography>
+        )}
+      </Paper>
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
+    </Box>
+  );
+};
+
+export default Reports;

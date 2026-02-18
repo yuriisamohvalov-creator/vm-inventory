@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>VM Inventory Report</title>
+    <style>
+        @page {
+            size: A4 landscape;
+            margin: 1.5cm;
+        }
+        body {
+            font-family: 'Helvetica', 'Arial', sans-serif;
+            font-size: 10pt;
+            line-height: 1.4;
+        }
+        h1 {
+            font-size: 18pt;
+            color: #1A237E;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 5px;
+        }
+        h2 {
+            font-size: 14pt;
+            color: #1A237E;
+            margin-top: 15px;
+        }
+        h3 {
+            font-size: 12pt;
+            color: #1A237E;
+            margin-top: 10px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 15px;
+        }
+        th {
+            background-color: #4CAF50;
+            color: white;
+            font-weight: bold;
+            padding: 6px;
+            text-align: left;
+        }
+        td {
+            padding: 4px 6px;
+            border-bottom: 1px solid #ddd;
+        }
+        .quota-info {
+            font-size: 9pt;
+            color: #666;
+            margin-left: 10px;
+        }
+        .warning {
+            color: #ff5722;
+            font-weight: bold;
+            margin-left: 5px;
+        }
+        .summary-row {
+            background-color: #f5f5f5;
+            font-weight: bold;
+        }
+        .department-total {
+            background-color: #e8f5e9;
+            font-weight: bold;
+        }
+        .stream-total {
+            background-color: #f1f8e9;
+        }
+    </style>
+</head>
+<body>
+    <h1>VM Inventory Report</h1>
+    <p>Generated: {% now "Y-m-d H:i:s" %}</p>
+
+    {% for dept in departments %}
+    <div style="margin-bottom: 30px;">
+        <h2>
+            {{ dept.name }}
+            {% if dept.vm_count > dept.vm_quota or dept.total_cpu > dept.cpu_quota %}
+                <span class="warning">⚠️ Quota exceeded</span>
+            {% endif %}
+        </h2>
+        <div class="quota-info">
+            VMs: {{ dept.vm_count }}{% if dept.vm_quota %}/{{ dept.vm_quota }}{% endif %} |
+            CPU: {{ dept.total_cpu }}{% if dept.cpu_quota %}/{{ dept.cpu_quota }}{% endif %} |
+            RAM: {{ dept.total_ram }} GB{% if dept.ram_quota %}/{{ dept.ram_quota }} GB{% endif %} |
+            Disk: {{ dept.total_disk }} GB{% if dept.disk_quota %}/{{ dept.disk_quota }} GB{% endif %}
+        </div>
+
+        {% for stream in dept.streams %}
+        <div style="margin-left: 20px;">
+            <h3>{{ stream.name }}</h3>
+            <div class="quota-info">
+                VMs: {{ stream.vm_count }} | 
+                CPU: {{ stream.total_cpu }} | 
+                RAM: {{ stream.total_ram }} GB | 
+                Disk: {{ stream.total_disk }} GB
+            </div>
+
+            {% for isys in stream.info_systems %}
+            <div style="margin-left: 20px; margin-top: 10px;">
+                <strong>{{ isys.name }} ({{ isys.code }})</strong>
+                <div class="quota-info">
+                    VMs: {{ isys.vm_count }} | 
+                    CPU: {{ isys.total_cpu }} | 
+                    RAM: {{ isys.total_ram }} GB | 
+                    Disk: {{ isys.total_disk }} GB
+                </div>
+
+                {% if isys.vms %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th>FQDN</th>
+                            <th>IP</th>
+                            <th>CPU</th>
+                            <th>RAM (GB)</th>
+                            <th>Disk (GB)</th>
+                            <th>Instance</th>
+                            <th>Tags</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for vm in isys.vms %}
+                        <tr>
+                            <td>{{ vm.fqdn }}</td>
+                            <td>{{ vm.ip }}</td>
+                            <td>{{ vm.cpu }}</td>
+                            <td>{{ vm.ram }}</td>
+                            <td>{{ vm.disk }}</td>
+                            <td>{{ vm.instance }}</td>
+                            <td>{{ vm.tags|join:", " }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <p style="color: #999; margin-left: 20px;">No VMs in this system</p>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% endfor %}
+    </div>
+    {% endfor %}
+</body>
+</html>
