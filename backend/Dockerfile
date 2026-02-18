@@ -3,7 +3,6 @@ FROM python:3.12-slim
 WORKDIR /app
 
 # Устанавливаем системные зависимости для WeasyPrint и других библиотек
-# Для Debian Trixie используется обновленное имя пакета libgdk-pixbuf-2.0-0
 RUN apt-get update && apt-get install -y \
     gcc \
     python3-dev \
@@ -15,9 +14,12 @@ RUN apt-get update && apt-get install -y \
     shared-mime-info \
     && rm -rf /var/lib/apt/lists/*
 
-# Копируем requirements и устанавливаем зависимости
+# Копируем requirements
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+
+# Устанавливаем setuptools и pip последней версии, затем зависимости
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir -r requirements.txt
 
 # Копируем код приложения
 COPY . .

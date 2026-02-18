@@ -1,28 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Box,
-  Typography,
-  Button,
-  Paper,
-  CircularProgress,
-  Alert,
-  ButtonGroup,
-  Snackbar
-} from '@mui/material';
-import {
-  PictureAsPdf as PdfIcon,
-  TableChart as ExcelIcon,
-  Code as JsonIcon
-} from '@mui/icons-material';
+// Исправляем путь к api - убираем "../", так как services находится в src
 import api from '../services/api';
-import ReportTree from '../components/ReportTree';
 
 const Reports = () => {
   const [reportData, setReportData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [exportLoading, setExportLoading] = useState(false);
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
 
   useEffect(() => {
     fetchReportData();
@@ -44,193 +28,165 @@ const Reports = () => {
 
   const handleExport = async (format) => {
     setExportLoading(true);
-    setSnackbar({ open: false, message: '', severity: 'info' });
-    
     try {
-      // Определяем URL и имя файла
-      let url = `/report/${format}/`;
-      let filename = `vm_report.${format === 'xlsx' ? 'xlsx' : format}`;
+      const url = `/report/${format}/`;
+      const filename = `vm_report.${format === 'xlsx' ? 'xlsx' : format}`;
       
-      console.log(`Exporting to ${format} from ${url}`);
-      
-      // Важно: указываем responseType: 'blob' для получения бинарных данных
       const response = await api.get(url, {
-        responseType: 'blob',
-        // Добавляем заголовок для правильной обработки
-        headers: {
-          'Accept': format === 'json' 
-            ? 'application/json' 
-            : format === 'pdf' 
-              ? 'application/pdf' 
-              : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        }
+        responseType: 'blob'
       });
 
-      console.log('Response received:', response);
-
-      // Проверяем, что ответ действительно содержит данные
-      if (!response.data || response.data.size === 0) {
-        throw new Error('Empty response received');
-      }
-
-      // Создаем blob из полученных данных
-      const blob = new Blob([response.data], { 
-        type: response.headers['content-type'] || 
-              (format === 'json' ? 'application/json' : 
-               format === 'pdf' ? 'application/pdf' : 
-               'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-      });
-      
-      // Создаем ссылку для скачивания
+      const blob = new Blob([response.data]);
       const downloadUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = downloadUrl;
       link.setAttribute('download', filename);
-      
-      // Добавляем ссылку в DOM, кликаем и удаляем
       document.body.appendChild(link);
       link.click();
       
-      // Очищаем
       setTimeout(() => {
         document.body.removeChild(link);
         window.URL.revokeObjectURL(downloadUrl);
       }, 100);
 
-      setSnackbar({
-        open: true,
-        message: `Report exported as ${format.toUpperCase()}`,
-        severity: 'success'
-      });
-
+      alert(`Report exported as ${format.toUpperCase()}`);
     } catch (err) {
       console.error(`Export to ${format} failed:`, err);
-      
-      // Пытаемся прочитать ошибку из ответа, если это JSON
-      if (err.response && err.response.data instanceof Blob) {
-        const text = await err.response.data.text();
-        try {
-          const errorData = JSON.parse(text);
-          setSnackbar({
-            open: true,
-            message: `Export failed: ${errorData.detail || errorData.message || 'Unknown error'}`,
-            severity: 'error'
-          });
-        } catch {
-          setSnackbar({
-            open: true,
-            message: `Export failed: Server error (${err.response.status})`,
-            severity: 'error'
-          });
-        }
-      } else {
-        setSnackbar({
-          open: true,
-          message: `Export failed: ${err.message || 'Network error'}`,
-          severity: 'error'
-        });
-      }
+      alert(`Export failed: ${err.message}`);
     } finally {
       setExportLoading(false);
     }
   };
 
-  const handleCloseSnackbar = () => {
-    setSnackbar({ ...snackbar, open: false });
-  };
-
   if (loading) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
-        <CircularProgress />
-      </Box>
+      <div style={{ padding: '20px', textAlign: 'center' }}>
+        <h2>Loading report data...</h2>
+      </div>
     );
   }
 
+  if (error) {
+    return (
+      <div style={{ padding: '20px', color: 'red' }}>
+        <h2>Error</h2>
+        <p>{error}</p>
+        <button onClick={fetchReportData}>Retry</button>
+      </div>
+    );
+  }
+
+  const renderDepartment = (dept) => (
+    <div key={dept.id} style={{ marginBottom: '20px', borderLeft: '3px solid #4CAF50', paddingLeft: '10px' }}>
+      <h3 style={{ color: '#1A237E' }}>
+        {dept.name}
+        {dept.vm_count > dept.vm_quota && <span style={{ color: 'red', marginLeft: '10px' }}>⚠️</span>}
+      </h3>
+      <p>VMs: {dept.vm_count} | CPU: {dept.total_cpu} | RAM: {dept.total_ram} GB | Disk: {dept.total_disk} GB</p>
+      {dept.streams && dept.streams.map(stream => renderStream(stream))}
+    </div>
+  );
+
+  const renderStream = (stream) => (
+    <div key={stream.id} style={{ marginLeft: '20px', marginBottom: '15px' }}>
+      <h4 style={{ color: '#1A237E' }}>{stream.name}</h4>
+      <p>VMs: {stream.vm_count} | CPU: {stream.total_cpu} | RAM: {stream.total_ram} GB | Disk: {stream.total_disk} GB</p>
+      {stream.info_systems && stream.info_systems.map(isys => renderInfoSystem(isys))}
+    </div>
+  );
+
+  const renderInfoSystem = (isys) => (
+    <div key={isys.id} style={{ marginLeft: '20px', marginBottom: '10px' }}>
+      <h5 style={{ color: '#1A237E' }}>{isys.name} ({isys.code})</h5>
+      <p>VMs: {isys.vm_count} | CPU: {isys.total_cpu} | RAM: {isys.total_ram} GB | Disk: {isys.total_disk} GB</p>
+      {isys.vms && isys.vms.length > 0 && (
+        <table style={{ width: '100%', borderCollapse: 'collapse', marginLeft: '20px' }}>
+          <thead>
+            <tr style={{ backgroundColor: '#4CAF50', color: 'white' }}>
+              <th style={{ padding: '5px' }}>FQDN</th>
+              <th style={{ padding: '5px' }}>IP</th>
+              <th style={{ padding: '5px' }}>CPU</th>
+              <th style={{ padding: '5px' }}>RAM</th>
+              <th style={{ padding: '5px' }}>Disk</th>
+              <th style={{ padding: '5px' }}>Tags</th>
+            </tr>
+          </thead>
+          <tbody>
+            {isys.vms.map(vm => (
+              <tr key={vm.fqdn} style={{ borderBottom: '1px solid #ddd' }}>
+                <td style={{ padding: '5px' }}>{vm.fqdn}</td>
+                <td style={{ padding: '5px' }}>{vm.ip}</td>
+                <td style={{ padding: '5px' }}>{vm.cpu}</td>
+                <td style={{ padding: '5px' }}>{vm.ram}</td>
+                <td style={{ padding: '5px' }}>{vm.disk}</td>
+                <td style={{ padding: '5px' }}>{vm.tags?.join(', ')}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+
   return (
-    <Box>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h4" component="h1">
-          VM Inventory Report
-        </Typography>
-        
-        <ButtonGroup variant="contained" aria-label="export buttons" disabled={exportLoading}>
-          <Button
+    <div style={{ padding: '20px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <h1>VM Inventory Report</h1>
+        <div>
+          <button 
             onClick={() => handleExport('pdf')}
-            startIcon={<PdfIcon />}
             disabled={exportLoading}
-            sx={{ 
-              bgcolor: '#dc3545', 
-              '&:hover': { bgcolor: '#c82333' },
-              '&.Mui-disabled': { bgcolor: '#dc3545', opacity: 0.5 }
+            style={{ 
+              backgroundColor: '#dc3545', 
+              color: 'white', 
+              padding: '10px 20px', 
+              marginRight: '10px',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: exportLoading ? 'not-allowed' : 'pointer',
+              opacity: exportLoading ? 0.5 : 1
             }}
           >
             PDF
-          </Button>
-          <Button
+          </button>
+          <button 
             onClick={() => handleExport('xlsx')}
-            startIcon={<ExcelIcon />}
             disabled={exportLoading}
-            sx={{ 
-              bgcolor: '#28a745', 
-              '&:hover': { bgcolor: '#218838' },
-              '&.Mui-disabled': { bgcolor: '#28a745', opacity: 0.5 }
+            style={{ 
+              backgroundColor: '#28a745', 
+              color: 'white', 
+              padding: '10px 20px', 
+              marginRight: '10px',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: exportLoading ? 'not-allowed' : 'pointer',
+              opacity: exportLoading ? 0.5 : 1
             }}
           >
             Excel
-          </Button>
-          <Button
+          </button>
+          <button 
             onClick={() => handleExport('json')}
-            startIcon={<JsonIcon />}
             disabled={exportLoading}
-            sx={{ 
-              bgcolor: '#ffc107', 
-              color: '#000',
-              '&:hover': { bgcolor: '#e0a800' },
-              '&.Mui-disabled': { bgcolor: '#ffc107', opacity: 0.5 }
+            style={{ 
+              backgroundColor: '#ffc107', 
+              color: 'black', 
+              padding: '10px 20px',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: exportLoading ? 'not-allowed' : 'pointer',
+              opacity: exportLoading ? 0.5 : 1
             }}
           >
             JSON
-          </Button>
-        </ButtonGroup>
-      </Box>
+          </button>
+        </div>
+      </div>
 
-      {exportLoading && (
-        <Box display="flex" justifyContent="center" my={2}>
-          <CircularProgress size={24} />
-          <Typography variant="body2" sx={{ ml: 1 }}>
-            Generating export...
-          </Typography>
-        </Box>
-      )}
+      {exportLoading && <p>Generating export...</p>}
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-          {error}
-        </Alert>
-      )}
-
-      <Paper sx={{ p: 3 }}>
-        {reportData ? (
-          <ReportTree data={reportData} />
-        ) : (
-          <Typography color="text.secondary" align="center">
-            No data available
-          </Typography>
-        )}
-      </Paper>
-
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={6000}
-        onClose={handleCloseSnackbar}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
-    </Box>
+      {reportData && reportData.map(dept => renderDepartment(dept))}
+    </div>
   );
 };
 
