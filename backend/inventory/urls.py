@@ -13,6 +13,8 @@ router.register('pools', views.PoolViewSet, basename='pool')
 router.register('report', views.ReportViewSet, basename='report')
 
 urlpatterns = [
+    # Явные пути для экспорта отчетов (должны быть ПЕРЕД роутером для приоритета)
+    path('report/export/', ReportExportView.as_view(), name='report-export-direct'),
     path('', include(router.urls)),
     # Импорт эндпоинты согласно промту
     path('v1/departments/import', import_export.ImportDepartmentsView.as_view(), name='import-departments'),
@@ -24,8 +26,6 @@ urlpatterns = [
     path('v1/search', import_export.search, name='search'),
     # Отчет в JSON
     path('v1/report/json', views.ReportViewSet.as_view({'get': 'export_json'}), name='report-json'),
-    # Явные пути для экспорта отчетов (для надежности)
-    path('report/export/', ReportExportView.as_view(), name='report-export-direct'),
     # Обратная совместимость со старыми путями
     path('import/departments/', import_export.ImportDepartmentsView.as_view(), name='import-departments-legacy'),
     path('import/streams/', import_export.ImportStreamsView.as_view(), name='import-streams-legacy'),
