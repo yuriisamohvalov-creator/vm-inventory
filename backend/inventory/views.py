@@ -39,6 +39,127 @@ class InfoSystemViewSet(viewsets.ModelViewSet):
             qs = qs.filter(stream_id=stream_id)
         return qs
 
+    def create(self, request, *args, **kwargs):
+        """Поддержка массового создания и обработка stream_name/department_name."""
+        data = request.data
+        
+        # Если передан массив, обрабатываем массовое создание
+        if isinstance(data, list):
+            return self._bulk_create(data)
+        
+        # Если передан объект с stream_name/department_name, обрабатываем их
+        if isinstance(data, dict) and ('stream_name' in data or 'department_name' in data):
+            data = self._resolve_stream_from_names(data.copy())
+        
+        return super().create(request, *args, **kwargs)
+
+    def _resolve_stream_from_names(self, data):
+        """Разрешить stream из stream_name и department_name."""
+        from .import_export import _get_or_create_department, _get_or_create_stream
+        
+        stream_id = data.get('stream')
+        stream_name = data.get('stream_name')
+        department_name = data.get('department_name')
+        
+        # Если есть stream_id, проверяем его валидность и используем
+        if stream_id:
+            try:
+                stream = Stream.objects.get(pk=stream_id)
+                # Если также указаны stream_name и department_name, проверяем соответствие
+                if stream_name and department_name:
+                    if stream.name != stream_name.strip() or stream.department.name != department_name.strip():
+                        # Несоответствие, но используем stream_id как приоритетный
+                        pass
+                data['stream'] = stream.id
+                # Удаляем временные поля
+                data.pop('stream_name', None)
+                data.pop('department_name', None)
+                return data
+            except Stream.DoesNotExist:
+                # stream_id не найден, пытаемся найти по именам
+                pass
+        
+        # Если есть stream_name и department_name, создаем/находим их
+        if stream_name and department_name:
+            dept = _get_or_create_department(department_name.strip())
+            stream = _get_or_create_stream(stream_name.strip(), dept)
+            data['stream'] = stream.id
+        
+        # Удаляем временные поля
+        data.pop('stream_name', None)
+        data.pop('department_name', None)
+        
+        return data
+
+    def _bulk_create(self, data_list):
+        """Массовое создание ИС."""
+        from rest_framework.response import Response
+        from rest_framework import status
+        from .import_export import _get_or_create_department, _get_or_create_stream
+        
+        created = []
+        errors = []
+        
+        for idx, item in enumerate(data_list):
+            try:
+                # Разрешить stream из stream_name/department_name
+                item = self._resolve_stream_from_names(item.copy())
+                
+                # Валидация обязательных полей
+                name = (item.get('name') or '').strip()
+                if not name:
+                    errors.append({'index': idx, 'error': 'Поле name обязательно'})
+                    continue
+                
+                stream_id = item.get('stream')
+                if not stream_id:
+                    errors.append({'index': idx, 'error': 'Поле stream обязательно'})
+                    continue
+                
+                try:
+                    stream = Stream.objects.get(pk=stream_id)
+                except Stream.DoesNotExist:
+                    errors.append({'index': idx, 'error': f'Стрим с ID {stream_id} не найден'})
+                    continue
+                
+                # Создать или обновить ИС
+                isys, created_flag = InfoSystem.objects.get_or_create(
+                    name=name,
+                    stream=stream,
+                    defaults={
+                        'code': (item.get('code') or '').strip(),
+                        'is_id': (item.get('is_id') or '').strip(),
+                    }
+                )
+                
+                # Обновить, если уже существует
+                if not created_flag:
+                    if item.get('code') is not None:
+                        isys.code = (item.get('code') or '').strip()
+                    if item.get('is_id') is not None:
+                        isys.is_id = (item.get('is_id') or '').strip()
+                    isys.save()
+                
+                created.append({
+                    'id': isys.id,
+                    'name': isys.name,
+                    'created': created_flag
+                })
+            except Exception as e:
+                errors.append({'index': idx, 'error': str(e)})
+        
+        if errors:
+            return Response({
+                'created': len(created),
+                'errors': errors,
+                'items': created
+            }, status=status.HTTP_207_MULTI_STATUS)
+        
+        return Response({
+            'created': len(created),
+            'items': created
+        }, status=status.HTTP_201_CREATED)
+
 
 class VMViewSet(viewsets.ModelViewSet):
     queryset = VM.objects.select_related('info_system', 'info_system__stream', 'info_system__stream__department').all()
