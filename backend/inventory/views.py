@@ -10,6 +10,7 @@ from .serializers import (
     VMSerializer, PoolSerializer, PoolDetailSerializer, PoolVMSerializer,
 )
 from .report_pdf import build_report_pdf
+from .report_xlsx import build_report_xlsx
 
 
 class ReportExportPDFView(APIView):
@@ -547,3 +548,14 @@ class ReportViewSet(viewsets.ViewSet):
         """Выгрузка отчёта в виде JSON файла (legacy endpoint)."""
         from .import_export import report_json_response
         return report_json_response()
+
+    @action(detail=False, methods=['get'], url_path='export/xlsx')
+    def export_xlsx(self, request):
+        """Выгрузка отчёта в виде XLSX файла."""
+        buf = build_report_xlsx()
+        return FileResponse(
+            buf,
+            as_attachment=True,
+            filename='vm-inventory-report.xlsx',
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )

@@ -25,6 +25,8 @@ urlpatterns = [
     path('v1/search', import_export.search, name='search'),
     # Отчет в JSON
     path('v1/report/json', views.ReportViewSet.as_view({'get': 'export_json'}), name='report-json'),
+    # Отчет в XLSX
+    path('v1/report/xlsx', views.ReportViewSet.as_view({'get': 'export_xlsx'}), name='report-xlsx'),
     # Обратная совместимость со старыми путями
     path('import/departments/', import_export.ImportDepartmentsView.as_view(), name='import-departments-legacy'),
     path('import/streams/', import_export.ImportStreamsView.as_view(), name='import-streams-legacy'),
