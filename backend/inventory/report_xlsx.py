@@ -41,8 +41,10 @@ def build_report_xlsx():
         dept_sum_disk = 0
         
         # Департамент
+        dept_has_exceeded = False
+        dept_name = dept.name
         ws.merge_cells(f'A{row}:F{row}')
-        ws[f'A{row}'] = dept.name
+        ws[f'A{row}'] = dept_name
         ws[f'A{row}'].fill = dept_fill
         ws[f'A{row}'].font = dept_font
         row += 1
@@ -83,7 +85,10 @@ def build_report_xlsx():
                     
                     # ВМ
                     for vm in vms_list:
-                        ws[f'D{row}'] = vm.fqdn
+                        vm_fqdn = vm.fqdn
+                        if vm.info_system is None:
+                            vm_fqdn += " [ИС УДАЛЕНА]"
+                        ws[f'D{row}'] = vm_fqdn
                         ws[f'E{row}'] = vm.ip
                         ws[f'F{row}'] = vm.cpu
                         ws[f'G{row}'] = vm.ram
@@ -122,8 +127,30 @@ def build_report_xlsx():
                     dept_sum_disk += stream_sum_disk
         
         if dept_vm_count > 0:
+            # Проверка превышения квот
+            if dept.cpu_quota > 0 and dept_sum_cpu > dept.cpu_quota:
+                dept_has_exceeded = True
+            if dept.ram_quota > 0 and dept_sum_ram > dept.ram_quota:
+                dept_has_exceeded = True
+            if dept.disk_quota > 0 and dept_sum_disk > dept.disk_quota:
+                dept_has_exceeded = True
+            
             # Итого Департамент
-            ws[f'A{row}'] = f'Итого Департамент: {dept_vm_count} ВМ'
+            dept_tot = f'{"🚨 " if dept_has_exceeded else ""}Итого Департамент: {dept_vm_count} ВМ'
+            if dept.cpu_quota > 0:
+                dept_tot += f', CPU: {dept_sum_cpu}/{dept.cpu_quota}'
+            else:
+                dept_tot += f', CPU: {dept_sum_cpu}'
+            if dept.ram_quota > 0:
+                dept_tot += f', RAM: {dept_sum_ram}/{dept.ram_quota} ГБ'
+            else:
+                dept_tot += f', RAM: {dept_sum_ram} ГБ'
+            if dept.disk_quota > 0:
+                dept_tot += f', Диск: {dept_sum_disk}/{dept.disk_quota} ГБ'
+            else:
+                dept_tot += f', Диск: {dept_sum_disk} ГБ'
+            
+            ws[f'A{row}'] = dept_tot
             ws[f'F{row}'] = dept_sum_cpu
             ws[f'G{row}'] = dept_sum_ram
             ws[f'H{row}'] = dept_sum_disk
@@ -151,7 +178,7 @@ def build_report_xlsx():
         row += 1
         
         for vm in orphan_list:
-            ws[f'D{row}'] = vm.fqdn
+            ws[f'D{row}'] = vm.fqdn + " [ИС УДАЛЕНА]"
             ws[f'E{row}'] = vm.ip
             ws[f'F{row}'] = vm.cpu
             ws[f'G{row}'] = vm.ram

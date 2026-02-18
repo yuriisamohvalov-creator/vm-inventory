@@ -5,7 +5,7 @@ from .models import Department, Stream, InfoSystem, VM, Pool, PoolVM
 class DepartmentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Department
-        fields = ['id', 'name', 'short_name']
+        fields = ['id', 'name', 'short_name', 'cpu_quota', 'ram_quota', 'disk_quota']
 
 
 class StreamSerializer(serializers.ModelSerializer):

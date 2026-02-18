@@ -254,6 +254,12 @@ class PoolViewSet(viewsets.ModelViewSet):
                 remaining_vm.tags = result_tags.copy()
                 remaining_vm.save(update_fields=['tags'])
         
+        # Проверить, есть ли удаленная ВМ еще в других пулах
+        other_pools_count = PoolVM.objects.filter(vm=vm, removed_at__isnull=True).exclude(pool=pool).count()
+        if other_pools_count == 0:
+            # Если ВМ больше не в пулах, очистить original_tags во всех записях PoolVM для этой ВМ
+            PoolVM.objects.filter(vm=vm).update(original_tags=None)
+        
         return Response({'status': 'ok'})
 
 
@@ -270,7 +276,17 @@ class ReportViewSet(viewsets.ViewSet):
             dept_sum_cpu = 0
             dept_sum_ram = 0
             dept_sum_disk = 0
-            dept_data = {'id': dept.id, 'name': dept.name, 'streams': []}
+            # Проверка превышения квот
+            dept_has_exceeded = False
+            dept_data = {
+                'id': dept.id,
+                'name': dept.name,
+                'short_name': dept.short_name or '',
+                'cpu_quota': dept.cpu_quota,
+                'ram_quota': dept.ram_quota,
+                'disk_quota': dept.disk_quota,
+                'streams': []
+            }
             for stream in dept.streams.all():
                 stream_vm_count = 0
                 stream_sum_cpu = 0
@@ -281,12 +297,15 @@ class ReportViewSet(viewsets.ViewSet):
                     vms_qs = isys.vms.all()
                     vms_list = []
                     for vm in vms_qs:
+                        # Проверка, удалена ли ИС
+                        is_deleted = vm.info_system is None
                         vms_list.append({
                             'fqdn': vm.fqdn,
                             'ip': vm.ip,
                             'cpu': vm.cpu,
                             'ram': vm.ram,
                             'disk': vm.disk,
+                            'info_system_deleted': is_deleted,
                         })
                     aggr = vms_qs.aggregate(
                         sum_cpu=Sum('cpu'),
@@ -323,6 +342,14 @@ class ReportViewSet(viewsets.ViewSet):
             dept_data['sum_cpu'] = dept_sum_cpu
             dept_data['sum_ram'] = dept_sum_ram
             dept_data['sum_disk'] = dept_sum_disk
+            # Проверка превышения квот
+            if dept.cpu_quota > 0 and dept_sum_cpu > dept.cpu_quota:
+                dept_has_exceeded = True
+            if dept.ram_quota > 0 and dept_sum_ram > dept.ram_quota:
+                dept_has_exceeded = True
+            if dept.disk_quota > 0 and dept_sum_disk > dept.disk_quota:
+                dept_has_exceeded = True
+            dept_data['has_exceeded'] = dept_has_exceeded
             result.append(dept_data)
         # Orphan VMs (info_system deleted)
         orphan_vms = VM.objects.filter(info_system__isnull=True)
@@ -335,6 +362,7 @@ class ReportViewSet(viewsets.ViewSet):
                     'cpu': vm.cpu,
                     'ram': vm.ram,
                     'disk': vm.disk,
+                    'info_system_deleted': True,  # ВМ без ИС считаются как с удаленной ИС
                 })
             aggr = orphan_vms.aggregate(
                 sum_cpu=Sum('cpu'),

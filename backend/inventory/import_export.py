@@ -20,11 +20,32 @@ def _norm_tag(t):
     return (t or '').strip().upper().replace(' ', '_')
 
 
-def _get_or_create_department(name, short_name=None):
-    dept, _ = Department.objects.get_or_create(
+def _get_or_create_department(name, short_name=None, cpu_quota=None, ram_quota=None, disk_quota=None):
+    defaults = {'short_name': (short_name or '').strip()}
+    if cpu_quota is not None:
+        defaults['cpu_quota'] = int(cpu_quota) if cpu_quota else 0
+    if ram_quota is not None:
+        defaults['ram_quota'] = int(ram_quota) if ram_quota else 0
+    if disk_quota is not None:
+        defaults['disk_quota'] = int(disk_quota) if disk_quota else 0
+    dept, created = Department.objects.get_or_create(
         name=name.strip(),
-        defaults={'short_name': (short_name or '').strip()},
+        defaults=defaults,
     )
+    # Обновить квоты, если они указаны и департамент уже существовал
+    if not created:
+        updated = False
+        if cpu_quota is not None:
+            dept.cpu_quota = int(cpu_quota) if cpu_quota else 0
+            updated = True
+        if ram_quota is not None:
+            dept.ram_quota = int(ram_quota) if ram_quota else 0
+            updated = True
+        if disk_quota is not None:
+            dept.disk_quota = int(disk_quota) if disk_quota else 0
+            updated = True
+        if updated:
+            dept.save()
     return dept
 
 
@@ -150,13 +171,17 @@ class ImportDepartmentsView(APIView):
             if not name:
                 continue
             short_name = (item.get('short_name') or '').strip()
-            dept, created_flag = Department.objects.get_or_create(
+            cpu_quota = item.get('cpu_quota')
+            ram_quota = item.get('ram_quota')
+            disk_quota = item.get('disk_quota')
+            dept = _get_or_create_department(
                 name=name,
-                defaults={'short_name': short_name},
+                short_name=short_name,
+                cpu_quota=cpu_quota,
+                ram_quota=ram_quota,
+                disk_quota=disk_quota,
             )
-            if not created_flag and short_name != '':
-                dept.short_name = short_name
-                dept.save()
+            created_flag = dept.id not in (created + updated)
             (created if created_flag else updated).append(dept.id)
             for s in item.get('streams') or []:
                 sname = (s.get('name') or '').strip()
@@ -197,7 +222,13 @@ class ImportStreamsView(APIView):
                     pass
             if not dept and item.get('department'):
                 dd = item['department']
-                dept = _get_or_create_department(dd.get('name', ''), dd.get('short_name'))
+                dept = _get_or_create_department(
+                    dd.get('name', ''),
+                    short_name=dd.get('short_name'),
+                    cpu_quota=dd.get('cpu_quota'),
+                    ram_quota=dd.get('ram_quota'),
+                    disk_quota=dd.get('disk_quota'),
+                )
             if not dept:
                 return Response({'error': f'Департамент не найден для стрима: {name}'}, status=status.HTTP_400_BAD_REQUEST)
             stream, created_flag = Stream.objects.get_or_create(
@@ -246,7 +277,13 @@ class ImportInfoSystemsView(APIView):
                         pass
                 if not dept and sd.get('department'):
                     dd = sd['department']
-                    dept = _get_or_create_department(dd.get('name', ''), dd.get('short_name'))
+                    dept = _get_or_create_department(
+                        dd.get('name', ''),
+                        short_name=dd.get('short_name'),
+                        cpu_quota=dd.get('cpu_quota'),
+                        ram_quota=dd.get('ram_quota'),
+                        disk_quota=dd.get('disk_quota'),
+                    )
                 if dept:
                     stream = _get_or_create_stream(sd.get('name', ''), dept)
             if not stream:
@@ -362,8 +399,15 @@ class ImportPoolsView(APIView):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def search(request):
-    """Поиск по всем разделам: департаменты, стримы, ИС, ВМ, пулы."""
+    """Поиск по всем разделам или конкретному разделу: департаменты, стримы, ИС, ВМ, пулы.
+    
+    Параметры:
+    - q: поисковый запрос (обязательный)
+    - section: раздел для поиска (опционально): 'departments', 'streams', 'infosystems', 'vms', 'pools'
+    """
     q = (request.query_params.get('q') or '').strip()
+    section = (request.query_params.get('section') or '').strip().lower()
+    
     if not q or len(q) < 1:
         return Response({
             'departments': [],
@@ -372,23 +416,55 @@ def search(request):
             'vms': [],
             'pools': [],
         })
-    q_like = f'%{q}%'
-    depts = Department.objects.filter(
-        Q(name__icontains=q) | Q(short_name__icontains=q)
-    )[:50]
-    streams = Stream.objects.filter(name__icontains=q).select_related('department')[:50]
-    isys = InfoSystem.objects.filter(
-        Q(name__icontains=q) | Q(code__icontains=q) | Q(is_id__icontains=q)
-    ).select_related('stream', 'stream__department')[:50]
-    vms = VM.objects.filter(fqdn__icontains=q).select_related('info_system')[:50]
-    pools = Pool.objects.filter(name__icontains=q)[:50]
-    return Response({
-        'departments': DepartmentSerializer(depts, many=True).data,
-        'streams': StreamSerializer(streams, many=True).data,
-        'info_systems': InfoSystemSerializer(isys, many=True).data,
-        'vms': VMSerializer(vms, many=True).data,
-        'pools': PoolSerializer(pools, many=True).data,
-    })
+    
+    result = {}
+    
+    # Поиск в департаментах
+    if not section or section == 'departments':
+        depts = Department.objects.filter(
+            Q(name__icontains=q) | Q(short_name__icontains=q)
+        )[:50]
+        result['departments'] = DepartmentSerializer(depts, many=True).data
+    else:
+        result['departments'] = []
+    
+    # Поиск в стримах
+    if not section or section == 'streams':
+        streams = Stream.objects.filter(name__icontains=q).select_related('department')[:50]
+        result['streams'] = StreamSerializer(streams, many=True).data
+    else:
+        result['streams'] = []
+    
+    # Поиск в ИС
+    if not section or section == 'infosystems':
+        isys = InfoSystem.objects.filter(
+            Q(name__icontains=q) | Q(code__icontains=q) | Q(is_id__icontains=q)
+        ).select_related('stream', 'stream__department')[:50]
+        result['info_systems'] = InfoSystemSerializer(isys, many=True).data
+    else:
+        result['info_systems'] = []
+    
+    # Поиск в ВМ
+    if not section or section == 'vms':
+        vms = VM.objects.filter(
+            Q(fqdn__icontains=q) | Q(ip__icontains=q)
+        ).select_related('info_system')[:50]
+        # Также поиск по тегам
+        if not vms.exists():
+            # Поиск по тегам через JSONField
+            vms = VM.objects.filter(tags__icontains=q).select_related('info_system')[:50]
+        result['vms'] = VMSerializer(vms, many=True).data
+    else:
+        result['vms'] = []
+    
+    # Поиск в пулах
+    if not section or section == 'pools':
+        pools = Pool.objects.filter(name__icontains=q)[:50]
+        result['pools'] = PoolSerializer(pools, many=True).data
+    else:
+        result['pools'] = []
+    
+    return Response(result)
 
 
 def report_json_response():
@@ -404,7 +480,17 @@ def report_json_response():
         dept_sum_cpu = 0
         dept_sum_ram = 0
         dept_sum_disk = 0
-        dept_data = {'id': dept.id, 'name': dept.name, 'short_name': dept.short_name or '', 'streams': []}
+        # Проверка превышения квот
+        dept_has_exceeded = False
+        dept_data = {
+            'id': dept.id,
+            'name': dept.name,
+            'short_name': dept.short_name or '',
+            'cpu_quota': dept.cpu_quota,
+            'ram_quota': dept.ram_quota,
+            'disk_quota': dept.disk_quota,
+            'streams': []
+        }
         for stream in dept.streams.all():
             stream_vm_count = 0
             stream_sum_cpu = 0
@@ -421,6 +507,7 @@ def report_json_response():
                         'cpu': vm.cpu,
                         'ram': vm.ram,
                         'disk': vm.disk,
+                        'info_system_deleted': vm.info_system is None,
                     })
                 aggr = vms_qs.aggregate(sum_cpu=Sum('cpu'), sum_ram=Sum('ram'), sum_disk=Sum('disk'))
                 is_vm_count = len(vms_list)
@@ -455,6 +542,14 @@ def report_json_response():
         dept_data['sum_cpu'] = dept_sum_cpu
         dept_data['sum_ram'] = dept_sum_ram
         dept_data['sum_disk'] = dept_sum_disk
+        # Проверка превышения квот
+        if dept.cpu_quota > 0 and dept_sum_cpu > dept.cpu_quota:
+            dept_has_exceeded = True
+        if dept.ram_quota > 0 and dept_sum_ram > dept.ram_quota:
+            dept_has_exceeded = True
+        if dept.disk_quota > 0 and dept_sum_disk > dept.disk_quota:
+            dept_has_exceeded = True
+        dept_data['has_exceeded'] = dept_has_exceeded
         result.append(dept_data)
     orphan_vms = VM.objects.filter(info_system__isnull=True)
     if orphan_vms.exists():
@@ -466,6 +561,7 @@ def report_json_response():
                 'cpu': vm.cpu,
                 'ram': vm.ram,
                 'disk': vm.disk,
+                'info_system_deleted': True,  # ВМ без ИС считаются как с удаленной ИС
             })
         aggr = orphan_vms.aggregate(sum_cpu=Sum('cpu'), sum_ram=Sum('ram'), sum_disk=Sum('disk'))
         result.append({

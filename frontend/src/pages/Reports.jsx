@@ -57,10 +57,14 @@ export default function Reports() {
           {data.map((dept) => (
             <div key={dept.id ?? 'orphan'}>
               <div className="dept">
+                {dept.has_exceeded && '🚨 '}
                 {dept.name}
                 {(dept.vm_count !== undefined) && (
                   <span className="vm-count report-sums">
-                    ({dept.vm_count} ВМ, CPU: {dept.sum_cpu ?? 0}, RAM: {dept.sum_ram ?? 0} ГБ, Диск: {dept.sum_disk ?? 0} ГБ)
+                    (ВМ: {dept.vm_count}, CPU: {dept.sum_cpu ?? 0}
+                    {dept.cpu_quota > 0 ? `/${dept.cpu_quota}` : ''}, RAM: {dept.sum_ram ?? 0}
+                    {dept.ram_quota > 0 ? `/${dept.ram_quota}` : ''} ГБ, Диск: {dept.sum_disk ?? 0}
+                    {dept.disk_quota > 0 ? `/${dept.disk_quota}` : ''} ГБ)
                   </span>
                 )}
               </div>
@@ -83,8 +87,11 @@ export default function Reports() {
                       {(isys.vms || []).map((vm, i) => (
                         <div key={i} className="vm">
                           • {typeof vm === 'string' ? vm : vm.fqdn}
+                          {typeof vm === 'object' && vm.info_system_deleted && (
+                            <span className="vm-details" style={{ color: '#f44336', fontWeight: 'bold' }}> [ИС УДАЛЕНА]</span>
+                          )}
                           {typeof vm === 'object' && vm.ip && (
-                            <span className="vm-details"> ({vm.ip})</span>
+                            <span className="vm-details"> (IP: {vm.ip})</span>
                           )}
                           {typeof vm === 'object' && vm.cpu !== undefined && (
                             <span className="vm-details"> (CPU: {vm.cpu}, RAM: {vm.ram} ГБ, Диск: {vm.disk} ГБ)</span>

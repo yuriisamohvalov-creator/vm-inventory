@@ -4,6 +4,9 @@ from django.db import models
 class Department(models.Model):
     name = models.CharField(max_length=255)
     short_name = models.CharField(max_length=255, blank=True, default='')
+    cpu_quota = models.PositiveIntegerField(default=0)  # Квота ядер CPU
+    ram_quota = models.PositiveIntegerField(default=0)  # Квота RAM в ГБ
+    disk_quota = models.PositiveIntegerField(default=0)  # Квота диска в ГБ
 
     class Meta:
         ordering = ['name']
