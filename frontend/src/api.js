@@ -66,10 +66,9 @@ export const api = {
   },
   report: {
     list: () => request('/report/'),
-    pdf: () => request('/report/pdf/'),
-    /** Скачивание файла отчёта (всегда возвращает Blob для сохранения на диск). */
-    export: async (format) => {
-      const url = `${API}/report/export/?format=${encodeURIComponent(format)}`;
+    /** Скачивание отчёта в PDF (возвращает Blob). */
+    exportPdf: async () => {
+      const url = `${API}/report/export/`;
       const res = await fetch(url, { credentials: 'same-origin' });
       if (!res.ok) throw Object.assign(new Error(res.statusText), { status: res.status });
       return res.blob();

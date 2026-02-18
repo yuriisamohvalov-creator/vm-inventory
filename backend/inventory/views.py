@@ -2,6 +2,7 @@ from django.http import FileResponse
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from .models import Department, Stream, InfoSystem, VM, Pool, PoolVM
 from .serializers import (
@@ -9,6 +10,19 @@ from .serializers import (
     VMSerializer, PoolSerializer, PoolDetailSerializer, PoolVMSerializer,
 )
 from .report_pdf import build_report_pdf
+
+
+class ReportExportPDFView(APIView):
+    """Выгрузка отчёта только в PDF. Отдельный view для надёжного маршрута /api/report/export/."""
+
+    def get(self, request):
+        buf = build_report_pdf()
+        return FileResponse(
+            buf,
+            as_attachment=True,
+            filename='vm-inventory-report.pdf',
+            content_type='application/pdf',
+        )
 
 
 class DepartmentViewSet(viewsets.ModelViewSet):
@@ -516,32 +530,6 @@ class ReportViewSet(viewsets.ViewSet):
                 }],
             })
         return Response(result)
-
-    @action(detail=False, methods=['get'], url_path='export')
-    def export(self, request):
-        """Выгрузка отчёта в различных форматах: pdf, xlsx, json."""
-        format_type = request.query_params.get('format', 'pdf').lower()
-        
-        if format_type == 'json':
-            from .import_export import report_json_response
-            return report_json_response()
-        elif format_type == 'xlsx':
-            from .report_xlsx import build_report_xlsx
-            buf = build_report_xlsx()
-            return FileResponse(
-                buf,
-                as_attachment=True,
-                filename='vm-inventory-report.xlsx',
-                content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            )
-        else:  # pdf по умолчанию
-            buf = build_report_pdf()
-            return FileResponse(
-                buf,
-                as_attachment=True,
-                filename='vm-inventory-report.pdf',
-                content_type='application/pdf',
-            )
 
     @action(detail=False, methods=['get'], url_path='pdf')
     def pdf(self, request):

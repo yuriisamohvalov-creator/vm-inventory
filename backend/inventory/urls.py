@@ -12,8 +12,8 @@ router.register('pools', views.PoolViewSet, basename='pool')
 router.register('report', views.ReportViewSet, basename='report')
 
 urlpatterns = [
-    # Явный маршрут для экспорта (до роутера, чтобы /report/export/ не матчился как /report/<pk>/ с pk=export)
-    path('report/export/', views.ReportViewSet.as_view({'get': 'export'}), name='report-export'),
+    # Выгрузка отчёта только в PDF (отдельный view, чтобы не конфликтовать с роутером)
+    path('report/export/', views.ReportExportPDFView.as_view(), name='report-export'),
     path('', include(router.urls)),
     # Импорт эндпоинты согласно промту
     path('v1/departments/import', import_export.ImportDepartmentsView.as_view(), name='import-departments'),

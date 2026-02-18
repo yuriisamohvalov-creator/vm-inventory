@@ -5,7 +5,6 @@ export default function Reports() {
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(true)
   const [exportLoading, setExportLoading] = useState(false)
-  const [exportFormat, setExportFormat] = useState('pdf')
 
   useEffect(() => {
     api.report.list()
@@ -14,15 +13,14 @@ export default function Reports() {
       .finally(() => setLoading(false))
   }, [])
 
-  const downloadReport = async (format) => {
+  const downloadReportPdf = async () => {
     setExportLoading(true)
     try {
-      const blob = await api.report.export(format)
+      const blob = await api.report.exportPdf()
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      const extensions = { pdf: 'pdf', xlsx: 'xlsx', json: 'json' }
-      a.download = `vm-inventory-report.${extensions[format] || 'pdf'}`
+      a.download = 'vm-inventory-report.pdf'
       a.click()
       URL.revokeObjectURL(url)
     } catch (_) {}
@@ -37,21 +35,9 @@ export default function Reports() {
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1rem' }}>
           <span>Иерархический отчет: Департамент → Стрим → ИС → ВМ</span>
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-            <select
-              value={exportFormat}
-              onChange={(e) => setExportFormat(e.target.value)}
-              style={{ padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--bg-dark)', color: 'var(--text-primary)' }}
-              disabled={exportLoading}
-            >
-              <option value="pdf">PDF</option>
-              <option value="xlsx">XLSX</option>
-              <option value="json">JSON</option>
-            </select>
-            <button className="btn" onClick={() => downloadReport(exportFormat)} disabled={exportLoading}>
-              {exportLoading ? 'Выгрузка…' : `Выгрузить в ${exportFormat.toUpperCase()}`}
-            </button>
-          </div>
+          <button className="btn" onClick={downloadReportPdf} disabled={exportLoading}>
+            {exportLoading ? 'Выгрузка…' : 'Выгрузить PDF'}
+          </button>
         </div>
         <div className="report-tree">
           {data.map((dept) => (
