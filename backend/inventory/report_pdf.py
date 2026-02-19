@@ -84,8 +84,14 @@ def build_report_pdf():
         dept_sum_cpu = 0
         dept_sum_ram = 0
         dept_sum_disk = 0
+        # Проверка превышения квот
+        dept_has_exceeded = False
         c.setFont(font_bold, 12)
-        c.drawString(2 * cm, y, dept.name)
+        dept_title = dept.name
+        if dept.cpu_quota > 0 or dept.ram_quota > 0 or dept.disk_quota > 0:
+            # Проверим после подсчета сумм
+            pass
+        c.drawString(2 * cm, y, dept_title)
         y -= 0.8 * cm
         for stream in dept.streams.all():
             stream_vm_count = 0
@@ -105,7 +111,11 @@ def build_report_pdf():
                         c.showPage()
                         y = height - 2 * cm
                     c.setFont(font_normal, 9)
-                    c.drawString(5 * cm, y, "  • %s (%s) (CPU: %d, RAM: %d ГБ, Диск: %d ГБ)" % (vm.fqdn, vm.ip, vm.cpu, vm.ram, vm.disk))
+                    vm_text = "  • %s (%s)" % (vm.fqdn, vm.ip)
+                    if vm.info_system is None:
+                        vm_text += " [ИС УДАЛЕНА]"
+                    vm_text += " (CPU: %d, RAM: %d ГБ, Диск: %d ГБ)" % (vm.cpu, vm.ram, vm.disk)
+                    c.drawString(5 * cm, y, vm_text)
                     y -= 0.4 * cm
                 if vms_list:
                     sum_cpu = sum(vm.cpu for vm in vms_list)
@@ -137,12 +147,36 @@ def build_report_pdf():
                 dept_sum_disk += stream_sum_disk
             y -= 0.2 * cm
         if dept_vm_count > 0:
-            dept_tot = "Итого Департамент: %d ВМ, CPU: %d, RAM: %d ГБ, Диск: %d ГБ" % (dept_vm_count, dept_sum_cpu, dept_sum_ram, dept_sum_disk)
+            # Проверка превышения квот
+            if dept.cpu_quota > 0 and dept_sum_cpu > dept.cpu_quota:
+                dept_has_exceeded = True
+            if dept.ram_quota > 0 and dept_sum_ram > dept.ram_quota:
+                dept_has_exceeded = True
+            if dept.disk_quota > 0 and dept_sum_disk > dept.disk_quota:
+                dept_has_exceeded = True
+            
+            dept_tot = "Итого Департамент: %d ВМ" % dept_vm_count
+            if dept.cpu_quota > 0:
+                dept_tot += ", CPU: %d/%d" % (dept_sum_cpu, dept.cpu_quota)
+            else:
+                dept_tot += ", CPU: %d" % dept_sum_cpu
+            if dept.ram_quota > 0:
+                dept_tot += ", RAM: %d/%d ГБ" % (dept_sum_ram, dept.ram_quota)
+            else:
+                dept_tot += ", RAM: %d ГБ" % dept_sum_ram
+            if dept.disk_quota > 0:
+                dept_tot += ", Диск: %d/%d ГБ" % (dept_sum_disk, dept.disk_quota)
+            else:
+                dept_tot += ", Диск: %d ГБ" % dept_sum_disk
+            
             if y < 2 * cm:
                 c.showPage()
                 y = height - 2 * cm
             c.setFont(font_bold, 11)
-            c.drawString(2 * cm, y, dept_tot)
+            if dept_has_exceeded:
+                c.drawString(2 * cm, y, "🚨 " + dept_tot)
+            else:
+                c.drawString(2 * cm, y, dept_tot)
             y -= 0.7 * cm
         y -= 0.3 * cm
 
@@ -159,7 +193,9 @@ def build_report_pdf():
                 c.showPage()
                 y = height - 2 * cm
             c.setFont(font_normal, 9)
-            c.drawString(3 * cm, y, "  • %s (%s) (CPU: %d, RAM: %d ГБ, Диск: %d ГБ)" % (vm.fqdn, vm.ip, vm.cpu, vm.ram, vm.disk))
+            vm_text = "  • %s (%s) [ИС УДАЛЕНА]" % (vm.fqdn, vm.ip)
+            vm_text += " (CPU: %d, RAM: %d ГБ, Диск: %d ГБ)" % (vm.cpu, vm.ram, vm.disk)
+            c.drawString(3 * cm, y, vm_text)
             y -= 0.4 * cm
         sum_cpu = sum(vm.cpu for vm in orphan_list)
         sum_ram = sum(vm.ram for vm in orphan_list)

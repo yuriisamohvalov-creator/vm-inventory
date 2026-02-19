@@ -9,7 +9,7 @@ export default function Admin() {
   const [infoSystems, setInfoSystems] = useState([])
   const [tab, setTab] = useState('departments')
   const [editing, setEditing] = useState(null)
-  const [form, setForm] = useState({ name: '', short_name: '', department: '', stream: '', code: '', is_id: '' })
+  const [form, setForm] = useState({ name: '', short_name: '', department: '', stream: '', code: '', is_id: '', cpu_quota: 0, ram_quota: 0, disk_quota: 0 })
   const [error, setError] = useState('')
   const [expandedDepts, setExpandedDepts] = useState(() => new Set())
   const [expandedStreams, setExpandedStreams] = useState(() => new Set())
@@ -32,8 +32,15 @@ export default function Admin() {
     setError('')
     try {
       if (tab === 'departments') {
-        if (editing) await api.departments.update(editing.id, { name: form.name, short_name: form.short_name })
-        else await api.departments.create({ name: form.name, short_name: form.short_name })
+        const payload = {
+          name: form.name,
+          short_name: form.short_name,
+          cpu_quota: Number(form.cpu_quota) || 0,
+          ram_quota: Number(form.ram_quota) || 0,
+          disk_quota: Number(form.disk_quota) || 0,
+        }
+        if (editing) await api.departments.update(editing.id, payload)
+        else await api.departments.create(payload)
       } else if (tab === 'streams') {
         if (editing) await api.streams.update(editing.id, { name: form.name, department: form.department })
         else await api.streams.create({ name: form.name, department: form.department })
@@ -42,7 +49,7 @@ export default function Admin() {
         else await api.infoSystems.create({ name: form.name, code: form.code, is_id: form.is_id, stream: form.stream })
       }
       setEditing(null)
-      setForm({ name: '', short_name: '', department: '', stream: '', code: '', is_id: '' })
+      setForm({ name: '', short_name: '', department: '', stream: '', code: '', is_id: '', cpu_quota: 0, ram_quota: 0, disk_quota: 0 })
       load()
     } catch (err) {
       setError(err.body?.name?.[0] || err.body?.detail || err.message || 'Ошибка')
@@ -66,9 +73,18 @@ export default function Admin() {
   const startEdit = (item, t) => {
     setTab(t)
     setEditing(item)
-    if (t === 'departments') setForm({ name: item.name, short_name: item.short_name || '', department: '', stream: '', code: '' })
-    else if (t === 'streams') setForm({ name: item.name, short_name: '', department: item.department, stream: '', code: '' })
-    else setForm({ name: item.name, short_name: '', department: '', stream: item.stream, code: item.code || '', is_id: item.is_id || '' })
+    if (t === 'departments') setForm({
+      name: item.name,
+      short_name: item.short_name || '',
+      department: '',
+      stream: '',
+      code: '',
+      cpu_quota: item.cpu_quota || 0,
+      ram_quota: item.ram_quota || 0,
+      disk_quota: item.disk_quota || 0,
+    })
+    else if (t === 'streams') setForm({ name: item.name, short_name: '', department: item.department, stream: '', code: '', cpu_quota: 0, ram_quota: 0, disk_quota: 0 })
+    else setForm({ name: item.name, short_name: '', department: '', stream: item.stream, code: item.code || '', is_id: item.is_id || '', cpu_quota: 0, ram_quota: 0, disk_quota: 0 })
   }
 
   return (
@@ -81,7 +97,7 @@ export default function Admin() {
               key={t}
               type="button"
               className={tab === t ? 'btn' : 'btn btn-secondary'}
-              onClick={() => { setTab(t); setEditing(null); setForm({ name: '', short_name: '', department: '', stream: '', code: '', is_id: '' }); }}
+              onClick={() => { setTab(t); setEditing(null); setForm({ name: '', short_name: '', department: '', stream: '', code: '', is_id: '', cpu_quota: 0, ram_quota: 0, disk_quota: 0 }); }}
             >
               {t === 'departments' && 'Департаменты'}
               {t === 'streams' && 'Стримы'}
@@ -100,13 +116,44 @@ export default function Admin() {
             />
           </div>
           {tab === 'departments' && (
-            <div className="form-group">
-              <label>Краткое название</label>
-              <input
-                value={form.short_name}
-                onChange={(e) => setForm((f) => ({ ...f, short_name: e.target.value }))}
-              />
-            </div>
+            <>
+              <div className="form-group">
+                <label>Краткое название</label>
+                <input
+                  value={form.short_name}
+                  onChange={(e) => setForm((f) => ({ ...f, short_name: e.target.value }))}
+                />
+              </div>
+              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                <div className="form-group">
+                  <label>Квота CPU</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={form.cpu_quota}
+                    onChange={(e) => setForm((f) => ({ ...f, cpu_quota: e.target.value }))}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Квота RAM (ГБ)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={form.ram_quota}
+                    onChange={(e) => setForm((f) => ({ ...f, ram_quota: e.target.value }))}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Квота DISK (ГБ)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={form.disk_quota}
+                    onChange={(e) => setForm((f) => ({ ...f, disk_quota: e.target.value }))}
+                  />
+                </div>
+              </div>
+            </>
           )}
           {tab === 'streams' && (
             <div className="form-group">

@@ -66,7 +66,26 @@ export const api = {
   },
   report: {
     list: () => request('/report/'),
-    pdf: () => request('/report/pdf/'),
-    export: (format) => request(`/report/export/?format=${format}`),
+    /** Скачивание отчёта в PDF (возвращает Blob). */
+    exportPdf: async () => {
+      const url = `${API}/report/export/`;
+      const res = await fetch(url, { credentials: 'same-origin' });
+      if (!res.ok) throw Object.assign(new Error(res.statusText), { status: res.status });
+      return res.blob();
+    },
+    /** Скачивание отчёта в XLSX (возвращает Blob). */
+    exportXlsx: async () => {
+      const url = `${API}/v1/report/xlsx`;
+      const res = await fetch(url, { credentials: 'same-origin' });
+      if (!res.ok) throw Object.assign(new Error(res.statusText), { status: res.status });
+      return res.blob();
+    },
+    /** Скачивание отчёта в JSON (возвращает Blob). */
+    exportJson: async () => {
+      const url = `${API}/v1/report/json`;
+      const res = await fetch(url, { credentials: 'same-origin' });
+      if (!res.ok) throw Object.assign(new Error(res.statusText), { status: res.status });
+      return res.blob();
+    },
   },
 };

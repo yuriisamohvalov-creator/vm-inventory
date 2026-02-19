@@ -2,6 +2,7 @@ from django.http import FileResponse
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from .models import Department, Stream, InfoSystem, VM, Pool, PoolVM
 from .serializers import (
@@ -9,6 +10,20 @@ from .serializers import (
     VMSerializer, PoolSerializer, PoolDetailSerializer, PoolVMSerializer,
 )
 from .report_pdf import build_report_pdf
+from .report_xlsx import build_report_xlsx
+
+
+class ReportExportPDFView(APIView):
+    """Выгрузка отчёта только в PDF. Отдельный view для надёжного маршрута /api/report/export/."""
+
+    def get(self, request):
+        buf = build_report_pdf()
+        return FileResponse(
+            buf,
+            as_attachment=True,
+            filename='vm-inventory-report.pdf',
+            content_type='application/pdf',
+        )
 
 
 class DepartmentViewSet(viewsets.ModelViewSet):
@@ -38,6 +53,127 @@ class InfoSystemViewSet(viewsets.ModelViewSet):
         if stream_id:
             qs = qs.filter(stream_id=stream_id)
         return qs
+
+    def create(self, request, *args, **kwargs):
+        """Поддержка массового создания и обработка stream_name/department_name."""
+        data = request.data
+        
+        # Если передан массив, обрабатываем массовое создание
+        if isinstance(data, list):
+            return self._bulk_create(data)
+        
+        # Если передан объект с stream_name/department_name, обрабатываем их
+        if isinstance(data, dict) and ('stream_name' in data or 'department_name' in data):
+            data = self._resolve_stream_from_names(data.copy())
+        
+        return super().create(request, *args, **kwargs)
+
+    def _resolve_stream_from_names(self, data):
+        """Разрешить stream из stream_name и department_name."""
+        from .import_export import _get_or_create_department, _get_or_create_stream
+        
+        stream_id = data.get('stream')
+        stream_name = data.get('stream_name')
+        department_name = data.get('department_name')
+        
+        # Если есть stream_id, проверяем его валидность и используем
+        if stream_id:
+            try:
+                stream = Stream.objects.get(pk=stream_id)
+                # Если также указаны stream_name и department_name, проверяем соответствие
+                if stream_name and department_name:
+                    if stream.name != stream_name.strip() or stream.department.name != department_name.strip():
+                        # Несоответствие, но используем stream_id как приоритетный
+                        pass
+                data['stream'] = stream.id
+                # Удаляем временные поля
+                data.pop('stream_name', None)
+                data.pop('department_name', None)
+                return data
+            except Stream.DoesNotExist:
+                # stream_id не найден, пытаемся найти по именам
+                pass
+        
+        # Если есть stream_name и department_name, создаем/находим их
+        if stream_name and department_name:
+            dept = _get_or_create_department(department_name.strip())
+            stream = _get_or_create_stream(stream_name.strip(), dept)
+            data['stream'] = stream.id
+        
+        # Удаляем временные поля
+        data.pop('stream_name', None)
+        data.pop('department_name', None)
+        
+        return data
+
+    def _bulk_create(self, data_list):
+        """Массовое создание ИС."""
+        from rest_framework.response import Response
+        from rest_framework import status
+        from .import_export import _get_or_create_department, _get_or_create_stream
+        
+        created = []
+        errors = []
+        
+        for idx, item in enumerate(data_list):
+            try:
+                # Разрешить stream из stream_name/department_name
+                item = self._resolve_stream_from_names(item.copy())
+                
+                # Валидация обязательных полей
+                name = (item.get('name') or '').strip()
+                if not name:
+                    errors.append({'index': idx, 'error': 'Поле name обязательно'})
+                    continue
+                
+                stream_id = item.get('stream')
+                if not stream_id:
+                    errors.append({'index': idx, 'error': 'Поле stream обязательно'})
+                    continue
+                
+                try:
+                    stream = Stream.objects.get(pk=stream_id)
+                except Stream.DoesNotExist:
+                    errors.append({'index': idx, 'error': f'Стрим с ID {stream_id} не найден'})
+                    continue
+                
+                # Создать или обновить ИС
+                isys, created_flag = InfoSystem.objects.get_or_create(
+                    name=name,
+                    stream=stream,
+                    defaults={
+                        'code': (item.get('code') or '').strip(),
+                        'is_id': (item.get('is_id') or '').strip(),
+                    }
+                )
+                
+                # Обновить, если уже существует
+                if not created_flag:
+                    if item.get('code') is not None:
+                        isys.code = (item.get('code') or '').strip()
+                    if item.get('is_id') is not None:
+                        isys.is_id = (item.get('is_id') or '').strip()
+                    isys.save()
+                
+                created.append({
+                    'id': isys.id,
+                    'name': isys.name,
+                    'created': created_flag
+                })
+            except Exception as e:
+                errors.append({'index': idx, 'error': str(e)})
+        
+        if errors:
+            return Response({
+                'created': len(created),
+                'errors': errors,
+                'items': created
+            }, status=status.HTTP_207_MULTI_STATUS)
+        
+        return Response({
+            'created': len(created),
+            'items': created
+        }, status=status.HTTP_201_CREATED)
 
 
 class VMViewSet(viewsets.ModelViewSet):
@@ -254,6 +390,12 @@ class PoolViewSet(viewsets.ModelViewSet):
                 remaining_vm.tags = result_tags.copy()
                 remaining_vm.save(update_fields=['tags'])
         
+        # Проверить, есть ли удаленная ВМ еще в других пулах
+        other_pools_count = PoolVM.objects.filter(vm=vm, removed_at__isnull=True).exclude(pool=pool).count()
+        if other_pools_count == 0:
+            # Если ВМ больше не в пулах, очистить original_tags во всех записях PoolVM для этой ВМ
+            PoolVM.objects.filter(vm=vm).update(original_tags=None)
+        
         return Response({'status': 'ok'})
 
 
@@ -270,7 +412,17 @@ class ReportViewSet(viewsets.ViewSet):
             dept_sum_cpu = 0
             dept_sum_ram = 0
             dept_sum_disk = 0
-            dept_data = {'id': dept.id, 'name': dept.name, 'streams': []}
+            # Проверка превышения квот
+            dept_has_exceeded = False
+            dept_data = {
+                'id': dept.id,
+                'name': dept.name,
+                'short_name': dept.short_name or '',
+                'cpu_quota': dept.cpu_quota,
+                'ram_quota': dept.ram_quota,
+                'disk_quota': dept.disk_quota,
+                'streams': []
+            }
             for stream in dept.streams.all():
                 stream_vm_count = 0
                 stream_sum_cpu = 0
@@ -281,12 +433,15 @@ class ReportViewSet(viewsets.ViewSet):
                     vms_qs = isys.vms.all()
                     vms_list = []
                     for vm in vms_qs:
+                        # Проверка, удалена ли ИС
+                        is_deleted = vm.info_system is None
                         vms_list.append({
                             'fqdn': vm.fqdn,
                             'ip': vm.ip,
                             'cpu': vm.cpu,
                             'ram': vm.ram,
                             'disk': vm.disk,
+                            'info_system_deleted': is_deleted,
                         })
                     aggr = vms_qs.aggregate(
                         sum_cpu=Sum('cpu'),
@@ -323,6 +478,14 @@ class ReportViewSet(viewsets.ViewSet):
             dept_data['sum_cpu'] = dept_sum_cpu
             dept_data['sum_ram'] = dept_sum_ram
             dept_data['sum_disk'] = dept_sum_disk
+            # Проверка превышения квот
+            if dept.cpu_quota > 0 and dept_sum_cpu > dept.cpu_quota:
+                dept_has_exceeded = True
+            if dept.ram_quota > 0 and dept_sum_ram > dept.ram_quota:
+                dept_has_exceeded = True
+            if dept.disk_quota > 0 and dept_sum_disk > dept.disk_quota:
+                dept_has_exceeded = True
+            dept_data['has_exceeded'] = dept_has_exceeded
             result.append(dept_data)
         # Orphan VMs (info_system deleted)
         orphan_vms = VM.objects.filter(info_system__isnull=True)
@@ -335,6 +498,7 @@ class ReportViewSet(viewsets.ViewSet):
                     'cpu': vm.cpu,
                     'ram': vm.ram,
                     'disk': vm.disk,
+                    'info_system_deleted': True,  # ВМ без ИС считаются как с удаленной ИС
                 })
             aggr = orphan_vms.aggregate(
                 sum_cpu=Sum('cpu'),
@@ -368,32 +532,6 @@ class ReportViewSet(viewsets.ViewSet):
             })
         return Response(result)
 
-    @action(detail=False, methods=['get'], url_path='export')
-    def export(self, request):
-        """Выгрузка отчёта в различных форматах: pdf, xlsx, json."""
-        format_type = request.query_params.get('format', 'pdf').lower()
-        
-        if format_type == 'json':
-            from .import_export import report_json_response
-            return report_json_response()
-        elif format_type == 'xlsx':
-            from .report_xlsx import build_report_xlsx
-            buf = build_report_xlsx()
-            return FileResponse(
-                buf,
-                as_attachment=True,
-                filename='vm-inventory-report.xlsx',
-                content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            )
-        else:  # pdf по умолчанию
-            buf = build_report_pdf()
-            return FileResponse(
-                buf,
-                as_attachment=True,
-                filename='vm-inventory-report.pdf',
-                content_type='application/pdf',
-            )
-
     @action(detail=False, methods=['get'], url_path='pdf')
     def pdf(self, request):
         """Export current report as PDF (legacy endpoint)."""
@@ -410,3 +548,14 @@ class ReportViewSet(viewsets.ViewSet):
         """Выгрузка отчёта в виде JSON файла (legacy endpoint)."""
         from .import_export import report_json_response
         return report_json_response()
+
+    @action(detail=False, methods=['get'], url_path='export/xlsx')
+    def export_xlsx(self, request):
+        """Выгрузка отчёта в виде XLSX файла."""
+        buf = build_report_xlsx()
+        return FileResponse(
+            buf,
+            as_attachment=True,
+            filename='vm-inventory-report.xlsx',
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
