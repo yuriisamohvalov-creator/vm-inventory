@@ -177,6 +177,22 @@ tr:hover td {
   margin-bottom: 1rem;
 }
 
+.form-row {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.form-row .form-group {
+  flex: 1 1 180px;
+  min-width: 160px;
+}
+
+.form-row .form-group input,
+.form-row .form-group select {
+  max-width: none;
+}
+
 .form-group label {
   display: block;
   margin-bottom: 0.35rem;
@@ -326,10 +342,56 @@ tr:hover td {
   margin-top: 0.5rem;
 }
 
+.warning-msg {
+  color: #fbbf24;
+  font-size: 0.9rem;
+  margin-top: 0.25rem;
+}
+
+.warning-msg-inline {
+  color: #fbbf24;
+  font-size: 0.8rem;
+  margin-left: 0.5rem;
+  font-weight: 600;
+}
+
 .empty-hint {
   color: var(--text-muted);
   font-size: 0.9rem;
   padding: 1rem;
+}
+
+.vm-grouped-table th,
+.vm-grouped-table td {
+  vertical-align: top;
+  font-size: 0.85rem;
+}
+
+.vm-grouped-table td .tags-row {
+  min-width: 140px;
+}
+
+.vm-group-row td {
+  font-weight: 600;
+  border-bottom: 1px solid var(--border);
+}
+
+.vm-group-row-department td {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary);
+}
+
+.vm-group-row-stream td {
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-primary);
+  font-style: italic;
+  padding-left: 1.25rem;
+}
+
+.vm-group-row-is td {
+  background: rgba(45, 106, 79, 0.12);
+  color: var(--accent-green-hover);
+  padding-left: 2rem;
 }
 
 /* VMs Hierarchical View */

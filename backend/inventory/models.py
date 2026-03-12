@@ -18,6 +18,9 @@ class Department(models.Model):
 class Stream(models.Model):
     name = models.CharField(max_length=255)
     department = models.ForeignKey(Department, on_delete=models.CASCADE, related_name='streams')
+    cpu_quota = models.PositiveIntegerField(default=0)  # Квота ядер CPU
+    ram_quota = models.PositiveIntegerField(default=0)  # Квота RAM в ГБ
+    disk_quota = models.PositiveIntegerField(default=0)  # Квота диска в ГБ
 
     class Meta:
         ordering = ['name']
