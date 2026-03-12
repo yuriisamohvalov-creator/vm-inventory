@@ -26,7 +26,7 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER:-vminventory}:${POSTGRES_PASSWORD:-vminventory_secret}@db:5432/${POSTGRES_DB:-vminventory}
       SECRET_KEY: ${SECRET_KEY:-dev-secret-key-change-in-production}
       DEBUG: ${DEBUG:-false}
-      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,backend,nginx}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,backend,nginx,192.168.20.10}
       LDAP_URI: ${LDAP_URI:-}
       LDAP_BIND_DN: ${LDAP_BIND_DN:-}
       LDAP_BIND_PASSWORD: ${LDAP_BIND_PASSWORD:-}
@@ -35,7 +35,7 @@ services:
     volumes:
       - static_volume:/app/staticfiles
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/')\""]
+      test: ["CMD-SHELL", "python -c \"import socket; s = socket.create_connection(('127.0.0.1', 8000), 5); s.close()\""]
       interval: 10s
       timeout: 5s
       retries: 3
