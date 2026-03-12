@@ -1,31 +1,23 @@
 #!/bin/bash
 
-# Script to build Docker images with custom tags in format: YYYYMMDD-vXXX
-# where XXX is a 3-digit number starting from 000
+# Script to build Docker images with custom tags in format:
+# <git-branch>-DDMMYYYY-HHMM
 
-# Get current date in YYYYMMDD format
-CURRENT_DATE=$(date +%Y%m%d)
+# Get current git branch name
+GIT_BRANCH=$(git branch --show-current)
+if [ -z "$GIT_BRANCH" ]; then
+    echo "Error: unable to determine current git branch."
+    exit 1
+fi
 
-# Find the highest existing tag number for today
-HIGHEST_TAG=0
-for tag in $(docker images --format "{{.Tag}}" | grep "^${CURRENT_DATE}-v" || true); do
-    # Extract the number part (XXX) from tag like "20260218-v001"
-    number_part=$(echo "$tag" | sed "s/${CURRENT_DATE}-v//")
-    # Remove leading zeros and convert to integer
-    number=${number_part#0}
-    if [[ "$number" =~ ^[0-9]+$ ]] && [ "$number" -gt "$HIGHEST_TAG" ]; then
-        HIGHEST_TAG=$number
-    fi
-done
+# Docker image tags support only [A-Za-z0-9_.-], so normalize branch name.
+SAFE_BRANCH=$(echo "$GIT_BRANCH" | sed 's|/|-|g' | sed 's|[^A-Za-z0-9_.-]|-|g')
 
-# Calculate next tag number (n+1)
-NEXT_TAG=$((HIGHEST_TAG + 1))
+# Get current timestamp in DDMMYYYY-HHMM format
+CURRENT_TIMESTAMP=$(date +%d%m%Y-%H%M)
 
-# Format the tag number as 3-digit with leading zeros
-FORMATTED_TAG=$(printf "%03d" "$NEXT_TAG")
-
-# Final tag in format YYYYMMDD-vXXX
-FINAL_TAG="${CURRENT_DATE}-v${FORMATTED_TAG}"
+# Final tag in format <git-branch>-DDMMYYYY-HHMM
+FINAL_TAG="${SAFE_BRANCH}-${CURRENT_TIMESTAMP}"
 
 echo "Building images with tag: $FINAL_TAG"
 
