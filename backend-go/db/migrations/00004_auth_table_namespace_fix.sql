@@ -1,10 +1,13 @@
 -- +goose Up
+-- Compatibility migration for environments where versions 2-3 were applied
+-- before vm_auth_* namespace was introduced.
 CREATE TABLE IF NOT EXISTS vm_auth_user (
     id BIGSERIAL PRIMARY KEY,
     username VARCHAR(255) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
     role VARCHAR(32) NOT NULL,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    must_change_password BOOLEAN NOT NULL DEFAULT FALSE,
     auth_source VARCHAR(32) NOT NULL DEFAULT 'local',
     ldap_groups JSONB NOT NULL DEFAULT '[]'::jsonb,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -33,6 +36,4 @@ CREATE INDEX IF NOT EXISTS idx_vm_auth_session_token_user_id ON vm_auth_session_
 CREATE INDEX IF NOT EXISTS idx_vm_auth_session_token_expires_at ON vm_auth_session_token(expires_at);
 
 -- +goose Down
-DROP TABLE IF EXISTS vm_auth_ldap_group_role_map;
-DROP TABLE IF EXISTS vm_auth_session_token;
-DROP TABLE IF EXISTS vm_auth_user;
+-- Keep data on downgrade for safety.

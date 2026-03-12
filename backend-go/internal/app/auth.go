@@ -163,7 +163,7 @@ func (a *App) authLogout(w http.ResponseWriter, r *http.Request) {
 
 	ctx, cancel := withTimeout(r.Context())
 	defer cancel()
-	_, _ = a.DB.Exec(ctx, `DELETE FROM auth_session_token WHERE token_hash=$1`, tokenHash(token))
+	_, _ = a.DB.Exec(ctx, `DELETE FROM vm_auth_session_token WHERE token_hash=$1`, tokenHash(token))
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -200,7 +200,7 @@ func (a *App) authChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_, err = a.DB.Exec(ctx, `
-		UPDATE auth_user
+		UPDATE vm_auth_user
 		SET password_hash=$2, must_change_password=FALSE, updated_at=NOW()
 		WHERE id=$1
 	`, user.ID, newHash)
@@ -221,7 +221,7 @@ func (a *App) listAuthUsers(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	rows, err := a.DB.Query(ctx, `
 		SELECT id, username, role, is_active, must_change_password, auth_source, ldap_groups, created_at, updated_at
-		FROM auth_user
+		FROM vm_auth_user
 		ORDER BY username
 	`)
 	if err != nil {
@@ -334,7 +334,7 @@ func (a *App) updateAuthUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_, err = a.DB.Exec(ctx, `
-		UPDATE auth_user
+		UPDATE vm_auth_user
 		SET role=$2, is_active=$3, password_hash=$4, ldap_groups=$5, must_change_password=$6, updated_at=NOW()
 		WHERE id=$1
 	`, id, curr.Role, curr.IsActive, passwordHash, toJSON(curr.LDAPGroups), curr.MustChange)
@@ -358,7 +358,7 @@ func (a *App) authenticateLocalUser(ctx context.Context, username string, passwo
 	}
 	row := a.DB.QueryRow(ctx, `
 		SELECT id, username, password_hash, role, is_active, must_change_password, auth_source, ldap_groups, created_at, updated_at
-		FROM auth_user
+		FROM vm_auth_user
 		WHERE username=$1
 	`, username)
 	if err := scanAuthUserWithPassword(row, &user); err != nil {
@@ -390,7 +390,7 @@ func (a *App) insertLocalUser(ctx context.Context, username, password, role stri
 		return out, err
 	}
 	err = a.DB.QueryRow(ctx, `
-		INSERT INTO auth_user (username, password_hash, role, is_active, must_change_password, auth_source, ldap_groups, created_at, updated_at)
+		INSERT INTO vm_auth_user (username, password_hash, role, is_active, must_change_password, auth_source, ldap_groups, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, 'local', $6, NOW(), NOW())
 		RETURNING id, username, role, is_active, must_change_password, auth_source, ldap_groups, created_at, updated_at
 	`, username, hash, role, isActive, mustChange, toJSON(ldapGroups)).Scan(
@@ -403,7 +403,7 @@ func (a *App) getAuthUserByID(ctx context.Context, id int64) (authUserWithPasswo
 	var out authUserWithPassword
 	row := a.DB.QueryRow(ctx, `
 		SELECT id, username, password_hash, role, is_active, must_change_password, auth_source, ldap_groups, created_at, updated_at
-		FROM auth_user
+		FROM vm_auth_user
 		WHERE id=$1
 	`, id)
 	err := scanAuthUserWithPassword(row, &out)
@@ -414,8 +414,8 @@ func (a *App) userByToken(ctx context.Context, token string) (AuthUser, error) {
 	var out AuthUser
 	row := a.DB.QueryRow(ctx, `
 		SELECT u.id, u.username, u.role, u.is_active, u.must_change_password, u.auth_source, u.ldap_groups, u.created_at, u.updated_at
-		FROM auth_session_token t
-		JOIN auth_user u ON u.id=t.user_id
+		FROM vm_auth_session_token t
+		JOIN vm_auth_user u ON u.id=t.user_id
 		WHERE t.token_hash=$1 AND t.expires_at > NOW()
 	`, tokenHash(token))
 	if err := scanAuthUser(row, &out); err != nil {
@@ -424,7 +424,7 @@ func (a *App) userByToken(ctx context.Context, token string) (AuthUser, error) {
 	if !out.IsActive {
 		return out, errors.New("inactive user")
 	}
-	_, _ = a.DB.Exec(ctx, `UPDATE auth_session_token SET last_used_at=NOW() WHERE token_hash=$1`, tokenHash(token))
+	_, _ = a.DB.Exec(ctx, `UPDATE vm_auth_session_token SET last_used_at=NOW() WHERE token_hash=$1`, tokenHash(token))
 	return out, nil
 }
 
@@ -435,7 +435,7 @@ func (a *App) createSessionToken(ctx context.Context, userID int64) (string, tim
 	}
 	expiresAt := time.Now().UTC().Add(time.Duration(a.Cfg.AuthTokenTTLMinutes) * time.Minute)
 	_, err = a.DB.Exec(ctx, `
-		INSERT INTO auth_session_token (user_id, token_hash, expires_at, created_at, last_used_at)
+		INSERT INTO vm_auth_session_token (user_id, token_hash, expires_at, created_at, last_used_at)
 		VALUES ($1, $2, $3, NOW(), NOW())
 	`, userID, tokenHash(token), expiresAt)
 	if err != nil {
@@ -446,7 +446,7 @@ func (a *App) createSessionToken(ctx context.Context, userID int64) (string, tim
 
 func (a *App) ensureBootstrapUser(ctx context.Context) error {
 	var usersCount int64
-	if err := a.DB.QueryRow(ctx, `SELECT COUNT(*) FROM auth_user`).Scan(&usersCount); err != nil {
+	if err := a.DB.QueryRow(ctx, `SELECT COUNT(*) FROM vm_auth_user`).Scan(&usersCount); err != nil {
 		return err
 	}
 	if usersCount > 0 {
@@ -478,7 +478,7 @@ func (a *App) resolveRoleFromLDAPGroups(ctx context.Context, groups []string) (s
 	}
 	rows, err := a.DB.Query(ctx, `
 		SELECT role
-		FROM auth_ldap_group_role_map
+		FROM vm_auth_ldap_group_role_map
 		WHERE LOWER(ldap_group_dn) = ANY($1)
 		ORDER BY CASE role WHEN 'admin' THEN 1 ELSE 2 END
 		LIMIT 1
