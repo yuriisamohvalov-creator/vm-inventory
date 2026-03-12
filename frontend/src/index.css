@@ -331,3 +331,90 @@ tr:hover td {
   font-size: 0.9rem;
   padding: 1rem;
 }
+
+/* VMs Hierarchical View */
+.vms-hierarchy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.department-section {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin-bottom: 0.5rem;
+  overflow: hidden;
+}
+
+.department-header {
+  padding: 0.75rem 1rem;
+  background: var(--bg-sidebar);
+  border-bottom: 1px solid var(--border);
+}
+
+.department-header:hover {
+  background: rgba(45, 106, 79, 0.2);
+}
+
+.stream-section {
+  border-left: 2px solid var(--border);
+  margin-bottom: 0.5rem;
+}
+
+.stream-header {
+  padding: 0.5rem 1rem;
+  background: rgba(45, 106, 79, 0.1);
+  border-bottom: 1px solid var(--border);
+}
+
+.stream-header:hover {
+  background: rgba(45, 106, 79, 0.2);
+}
+
+.vm-card {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 1rem;
+  margin-bottom: 0.5rem;
+  background: var(--card-bg);
+}
+
+.vm-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.vm-details {
+  max-height: 300px;
+  overflow-y: auto;
+  margin-top: 0.5rem;
+}
+
+.vm-details table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.vm-details td {
+  padding: 0.35rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.vm-details td:first-child {
+  width: 150px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.vm-details td:last-child {
+  color: var(--text-primary);
+}
+
+.vm-details .tags-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin: -0.25rem 0;
+}
