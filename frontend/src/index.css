@@ -342,6 +342,19 @@ tr:hover td {
   margin-top: 0.5rem;
 }
 
+.warning-msg {
+  color: #fbbf24;
+  font-size: 0.9rem;
+  margin-top: 0.25rem;
+}
+
+.warning-msg-inline {
+  color: #fbbf24;
+  font-size: 0.8rem;
+  margin-left: 0.5rem;
+  font-weight: 600;
+}
+
 .empty-hint {
   color: var(--text-muted);
   font-size: 0.9rem;

@@ -1,11 +1,55 @@
+from django.db.models import Sum
 from rest_framework import serializers
 from .models import Department, Stream, InfoSystem, VM, Pool, PoolVM
 
 
 class DepartmentSerializer(serializers.ModelSerializer):
+    streams_cpu_quota_sum = serializers.SerializerMethodField()
+    streams_ram_quota_sum = serializers.SerializerMethodField()
+    streams_disk_quota_sum = serializers.SerializerMethodField()
+    quota_exceeded = serializers.SerializerMethodField()
+
+    def _stream_quota_sums(self, obj):
+        cache_attr = '_cached_stream_quota_sums'
+        if hasattr(obj, cache_attr):
+            return getattr(obj, cache_attr)
+        sums = obj.streams.aggregate(
+            cpu=Sum('cpu_quota'),
+            ram=Sum('ram_quota'),
+            disk=Sum('disk_quota'),
+        )
+        result = {
+            'cpu': sums['cpu'] or 0,
+            'ram': sums['ram'] or 0,
+            'disk': sums['disk'] or 0,
+        }
+        setattr(obj, cache_attr, result)
+        return result
+
+    def get_streams_cpu_quota_sum(self, obj):
+        return self._stream_quota_sums(obj)['cpu']
+
+    def get_streams_ram_quota_sum(self, obj):
+        return self._stream_quota_sums(obj)['ram']
+
+    def get_streams_disk_quota_sum(self, obj):
+        return self._stream_quota_sums(obj)['disk']
+
+    def get_quota_exceeded(self, obj):
+        sums = self._stream_quota_sums(obj)
+        return (
+            sums['cpu'] > (obj.cpu_quota or 0) or
+            sums['ram'] > (obj.ram_quota or 0) or
+            sums['disk'] > (obj.disk_quota or 0)
+        )
+
     class Meta:
         model = Department
-        fields = ['id', 'name', 'short_name', 'cpu_quota', 'ram_quota', 'disk_quota']
+        fields = [
+            'id', 'name', 'short_name', 'cpu_quota', 'ram_quota', 'disk_quota',
+            'streams_cpu_quota_sum', 'streams_ram_quota_sum', 'streams_disk_quota_sum',
+            'quota_exceeded',
+        ]
 
 
 class StreamSerializer(serializers.ModelSerializer):
@@ -13,7 +57,7 @@ class StreamSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Stream
-        fields = ['id', 'name', 'department', 'department_name']
+        fields = ['id', 'name', 'department', 'department_name', 'cpu_quota', 'ram_quota', 'disk_quota']
 
 
 class InfoSystemSerializer(serializers.ModelSerializer):

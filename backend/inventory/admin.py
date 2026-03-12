@@ -9,7 +9,7 @@ class DepartmentAdmin(admin.ModelAdmin):
 
 @admin.register(Stream)
 class StreamAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name', 'department')
+    list_display = ('id', 'name', 'department', 'cpu_quota', 'ram_quota', 'disk_quota')
     list_filter = ('department',)
 
 
