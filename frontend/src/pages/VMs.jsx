@@ -34,6 +34,7 @@ export default function VMs() {
   const [form, setForm] = useState(defaultForm)
   const [customInput, setCustomInput] = useState('')
   const [error, setError] = useState('')
+  const [deleteError, setDeleteError] = useState('')
   const [ipWarning, setIpWarning] = useState('')
 
   const load = () => {
@@ -432,6 +433,7 @@ export default function VMs() {
       )}
 
       <div className="card">
+        {deleteError && <p className="error-msg">{deleteError}</p>}
         <div className="table-wrap">
           <table className="vm-grouped-table">
             <thead>
@@ -494,10 +496,14 @@ export default function VMs() {
                                   style={{ marginLeft: '0.5rem' }}
                                   onClick={async () => {
                                     if (!confirm('Удалить ВМ?')) return
+                                    setDeleteError('')
                                     try {
                                       await api.vms.delete(vm.id)
                                       load()
-                                    } catch (_) {}
+                                    } catch (err) {
+                                      const msg = err.body?.detail || err.body?.error || err.message || 'Не удалось удалить ВМ'
+                                      setDeleteError(msg)
+                                    }
                                   }}
                                 >
                                   Удалить
