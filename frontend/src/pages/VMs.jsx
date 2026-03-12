@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { Fragment, useState, useEffect } from 'react'
 import { api } from '../api'
 
 const OS_OPTIONS = [
@@ -35,8 +35,6 @@ export default function VMs() {
   const [customInput, setCustomInput] = useState('')
   const [error, setError] = useState('')
   const [ipWarning, setIpWarning] = useState('')
-  const [expandedDepartments, setExpandedDepartments] = useState({})
-  const [expandedStreams, setExpandedStreams] = useState({})
 
   const load = () => {
     api.vms.list().then((r) => setVms(r.results || r)).catch(() => setVms([]))
@@ -48,28 +46,23 @@ export default function VMs() {
   useEffect(() => { load() }, [])
 
 
-  const toggleDepartment = (departmentId) => {
-    setExpandedDepartments(prev => ({ ...prev, [departmentId]: !prev[departmentId] }))
-  }
-
-  const toggleStream = (streamId) => {
-    setExpandedStreams(prev => ({ ...prev, [streamId]: !prev[streamId] }))
-  }
-
-  // Group VMs by Department -> Stream
-  const groupVmsByDepartmentAndStream = () => {
+  // Group VMs by Department -> Stream -> Info System
+  const groupVmsForTable = () => {
     const grouped = {}
 
-    // First, get department and stream info for each VM
     const vmsWithInfo = vms.map(vm => {
       let departmentId = null
       let streamId = null
+      let infoSystemId = null
       let departmentName = 'Без департамента'
       let streamName = 'Без стрима'
+      let infoSystemName = 'Без ИС'
 
       if (vm.info_system) {
+        infoSystemId = vm.info_system
         const infoSystem = infoSystems.find(is => is.id === vm.info_system)
         if (infoSystem) {
+          infoSystemName = infoSystem.name
           streamId = infoSystem.stream
           const stream = streams.find(s => s.id === streamId)
           if (stream) {
@@ -87,34 +80,42 @@ export default function VMs() {
         ...vm,
         departmentId,
         streamId,
+        infoSystemId,
         departmentName,
-        streamName
+        streamName,
+        infoSystemName,
       }
     })
 
-    // Group by department
     vmsWithInfo.forEach(vm => {
       if (!grouped[vm.departmentId]) {
         grouped[vm.departmentId] = {
           departmentName: vm.departmentName,
-          streams: {}
+          streams: {},
         }
       }
 
       if (!grouped[vm.departmentId].streams[vm.streamId]) {
         grouped[vm.departmentId].streams[vm.streamId] = {
           streamName: vm.streamName,
-          vms: []
+          infoSystems: {},
         }
       }
 
-      grouped[vm.departmentId].streams[vm.streamId].vms.push(vm)
+      if (!grouped[vm.departmentId].streams[vm.streamId].infoSystems[vm.infoSystemId]) {
+        grouped[vm.departmentId].streams[vm.streamId].infoSystems[vm.infoSystemId] = {
+          infoSystemName: vm.infoSystemName,
+          vms: [],
+        }
+      }
+
+      grouped[vm.departmentId].streams[vm.streamId].infoSystems[vm.infoSystemId].vms.push(vm)
     })
 
     return grouped
   }
 
-  const groupedVms = groupVmsByDepartmentAndStream()
+  const groupedVms = groupVmsForTable()
   const list = Array.isArray(vms) ? vms : (vms.results || [])
 
   const buildTags = () => {
@@ -431,127 +432,92 @@ export default function VMs() {
       )}
 
       <div className="card">
-        <div className="vms-hierarchy">
-          {Object.entries(groupedVms).map(([departmentId, departmentData]) => (
-            <div key={departmentId} className="department-section">
-              <div
-                className="department-header"
-                onClick={() => toggleDepartment(departmentId)}
-              >
-                <span className="tree-toggle">
-                  {expandedDepartments[departmentId] ? '▼' : '▶'}
-                </span>
-                <h3 style={{ margin: 0 }}>{departmentData.departmentName}</h3>
-              </div>
-
-              {expandedDepartments[departmentId] && (
-                <div className="streams-container">
+        <div className="table-wrap">
+          <table className="vm-grouped-table">
+            <thead>
+              <tr>
+                <th>FQDN</th>
+                <th>IP адрес</th>
+                <th>CPU</th>
+                <th>RAM</th>
+                <th>Диск</th>
+                <th>Instance</th>
+                <th>Теги</th>
+                <th>БА.ПФМ_зак</th>
+                <th>БА.ПФМ_исп</th>
+                <th>БА.Финансовая_позиция</th>
+                <th>БА.Mir-код</th>
+                <th>БА.Программа_бюджета</th>
+                <th>Действия</th>
+              </tr>
+            </thead>
+            <tbody>
+              {Object.entries(groupedVms).map(([departmentId, departmentData]) => (
+                <Fragment key={`dept-${departmentId}`}>
+                  <tr className="vm-group-row vm-group-row-department">
+                    <td colSpan={13}>{departmentData.departmentName}</td>
+                  </tr>
                   {Object.entries(departmentData.streams).map(([streamId, streamData]) => (
-                    <div key={streamId} className="stream-section">
-                      <div
-                        className="stream-header"
-                        onClick={() => toggleStream(streamId)}
-                      >
-                        <span className="tree-toggle">
-                          {expandedStreams[streamId] ? '▼' : '▶'}
-                        </span>
-                        <h4 style={{ margin: 0 }}>{streamData.streamName}</h4>
-                      </div>
-
-                      {expandedStreams[streamId] && (
-                        <div className="vms-container">
-                          {streamData.vms.map((vm) => (
-                            <div key={vm.id} className="vm-card">
-                              <div className="vm-card-header">
-                                <h4 style={{ margin: 0 }}>{vm.fqdn}</h4>
-                                <div>
-                                  <button className="btn btn-sm btn-secondary" onClick={() => startEdit(vm)}>Редактировать</button>
-                                  <button
-                                    className="btn btn-sm btn-danger"
-                                    style={{ marginLeft: '0.5rem' }}
-                                    onClick={async () => {
-                                      if (!confirm('Удалить ВМ?')) return
-                                      try {
-                                        await api.vms.delete(vm.id)
-                                        load()
-                                      } catch (_) {}
-                                    }}
-                                  >
-                                    Удалить
-                                  </button>
+                    <Fragment key={`stream-${departmentId}-${streamId}`}>
+                      <tr className="vm-group-row vm-group-row-stream">
+                        <td colSpan={13}>{streamData.streamName}</td>
+                      </tr>
+                      {Object.entries(streamData.infoSystems).map(([infoSystemId, infoSystemData]) => (
+                        <Fragment key={`is-${departmentId}-${streamId}-${infoSystemId}`}>
+                          <tr className="vm-group-row vm-group-row-is">
+                            <td colSpan={13}>{infoSystemData.infoSystemName}</td>
+                          </tr>
+                          {infoSystemData.vms.map((vm) => (
+                            <tr key={vm.id}>
+                              <td>{vm.fqdn}</td>
+                              <td>{vm.ip || '000.000.000.000'}</td>
+                              <td>{vm.cpu}</td>
+                              <td>{vm.ram}</td>
+                              <td>{vm.disk}</td>
+                              <td>{vm.instance}</td>
+                              <td>
+                                <div className="tags-row">
+                                  {(vm.tags || []).map((t) => (
+                                    <span key={t} className="badge">{t}</span>
+                                  ))}
                                 </div>
-                              </div>
-
-                              <div className="vm-details">
-                                <table>
-                                  <tbody>
-                                    <tr>
-                                      <td>IP адрес:</td>
-                                      <td>{vm.ip || '000.000.000.000'}</td>
-                                    </tr>
-                                    <tr>
-                                      <td>CPU:</td>
-                                      <td>{vm.cpu} ядер</td>
-                                    </tr>
-                                    <tr>
-                                      <td>RAM:</td>
-                                      <td>{vm.ram} ГБ</td>
-                                    </tr>
-                                    <tr>
-                                      <td>Диск:</td>
-                                      <td>{vm.disk} ГБ</td>
-                                    </tr>
-                                    <tr>
-                                      <td>Instance:</td>
-                                      <td>{vm.instance}</td>
-                                    </tr>
-                                    <tr>
-                                      <td>Информационная система:</td>
-                                      <td>{vm.info_system_name || '—'}</td>
-                                    </tr>
-                                    <tr>
-                                      <td>Теги:</td>
-                                      <td>
-                                                        <div className="tags-row">
-                                                          {(vm.tags || []).map((t) => (
-                                                            <span key={t} className="badge">{t}</span>
-                                                          ))}
-                                                        </div>
-                                                      </td>
-                                    </tr>
-                                    <tr>
-                                      <td>БА.ПФМ_зак:</td>
-                                      <td>{vm.ba_pfm_zak}</td>
-                                    </tr>
-                                    <tr>
-                                      <td>БА.ПФМ_исп:</td>
-                                      <td>{vm.ba_pfm_isp}</td>
-                                    </tr>
-                                    <tr>
-                                      <td>БА.Программа_бюджета:</td>
-                                      <td>{vm.ba_programma_byudzheta || '—'}</td>
-                                    </tr>
-                                    <tr>
-                                      <td>БА.Финансовая_позиция:</td>
-                                      <td>{vm.ba_finansovaya_pozitsiya}</td>
-                                    </tr>
-                                    <tr>
-                                      <td>БА.Mir-код:</td>
-                                      <td>{vm.ba_mir_kod}</td>
-                                    </tr>
-                                  </tbody>
-                                </table>
-                              </div>
-                            </div>
+                              </td>
+                              <td>{vm.ba_pfm_zak || '—'}</td>
+                              <td>{vm.ba_pfm_isp || '—'}</td>
+                              <td>{vm.ba_finansovaya_pozitsiya || '—'}</td>
+                              <td>{vm.ba_mir_kod || '—'}</td>
+                              <td>{vm.ba_programma_byudzheta || '—'}</td>
+                              <td>
+                                <button className="btn btn-sm btn-secondary" onClick={() => startEdit(vm)}>Редактировать</button>
+                                <button
+                                  className="btn btn-sm btn-danger"
+                                  style={{ marginLeft: '0.5rem' }}
+                                  onClick={async () => {
+                                    if (!confirm('Удалить ВМ?')) return
+                                    try {
+                                      await api.vms.delete(vm.id)
+                                      load()
+                                    } catch (_) {}
+                                  }}
+                                >
+                                  Удалить
+                                </button>
+                              </td>
+                            </tr>
                           ))}
-                        </div>
-                      )}
-                    </div>
+                        </Fragment>
+                      ))}
+                    </Fragment>
                   ))}
-                </div>
+                </Fragment>
+              ))}
+              {list.length === 0 && (
+                <tr>
+                  <td colSpan={13} className="empty-hint">Список ВМ пуст</td>
+                </tr>
               )}
-            </div>
-          ))}
+            </tbody>
+          </table>
         </div>
       </div>
     </>
