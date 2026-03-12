@@ -21,9 +21,17 @@ class InfoSystemAdmin(admin.ModelAdmin):
 
 @admin.register(VM)
 class VMAdmin(admin.ModelAdmin):
-    list_display = ('fqdn', 'ip', 'cpu', 'ram', 'disk', 'instance', 'info_system')
+    list_display = ('fqdn', 'ip', 'cpu', 'ram', 'disk', 'instance', 'info_system', 'ba_pfm_zak', 'ba_pfm_isp')
     list_filter = ('instance',)
     search_fields = ('fqdn', 'ip')
+    fieldsets = (
+        (None, {
+            'fields': ('fqdn', 'ip', 'cpu', 'ram', 'disk', 'instance', 'tags', 'info_system')
+        }),
+        ('Бюджетный учет', {
+            'fields': ('ba_pfm_zak', 'ba_pfm_isp', 'ba_programma_byudzheta', 'ba_finansovaya_pozitsiya', 'ba_mir_kod'),
+        }),
+    )
 
 
 @admin.register(Pool)

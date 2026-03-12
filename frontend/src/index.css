@@ -282,7 +282,6 @@ th {
 .report-tree .report-sums { font-size: 0.85rem; color: var(--accent-green); margin-left: 0.5rem; font-weight: 600; }
 .report-tree .vm-details { font-size: 0.8rem; color: var(--text-muted); margin-left: 0.5rem; }
 
-.admin-tree { }
 .tree-node { margin-bottom: 0.25rem; }
 .tree-child { margin-left: 1.5rem; }
 .tree-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.5rem; border-radius: 4px; cursor: pointer; }

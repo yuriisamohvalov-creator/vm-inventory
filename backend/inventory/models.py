@@ -60,10 +60,17 @@ class VM(models.Model):
     ram = models.PositiveIntegerField(default=1)  # GB
     disk = models.PositiveIntegerField(default=10)  # GB
     instance = models.PositiveSmallIntegerField(default=1)  # 1-20
-    tags = models.JSONField(default=list)  # [OS, IS_NAME, custom...]
+    tags = models.JSONField(default=list)  # [OS, IS_CODE, custom...]
     info_system = models.ForeignKey(
         InfoSystem, on_delete=models.SET_NULL, null=True, blank=True, related_name='vms'
     )
+
+    # New fields for budget accounting
+    ba_pfm_zak = models.CharField(max_length=255, default='Z000000', verbose_name='БА.ПФМ_зак')
+    ba_pfm_isp = models.CharField(max_length=255, default='Z000000', verbose_name='БА.ПФМ_исп')
+    ba_programma_byudzheta = models.CharField(max_length=255, blank=True, null=True, verbose_name='БА.Программа_бюджета')
+    ba_finansovaya_pozitsiya = models.CharField(max_length=255, default='00.00.00.00', verbose_name='БА.Финансовая_позиция')
+    ba_mir_kod = models.CharField(max_length=255, default='ITI_000_0000', verbose_name='БА.Mir-код')
 
     class Meta:
         ordering = ['instance', 'fqdn']

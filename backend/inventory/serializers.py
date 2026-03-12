@@ -36,7 +36,9 @@ class VMSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'fqdn', 'ip', 'cpu', 'ram', 'disk', 'instance', 'tags',
             'info_system', 'info_system_name', 'info_system_code',
-            'department_name', 'stream_name'
+            'department_name', 'stream_name',
+            'ba_pfm_zak', 'ba_pfm_isp', 'ba_programma_byudzheta',
+            'ba_finansovaya_pozitsiya', 'ba_mir_kod'
         ]
 
     def get_info_system_name(self, obj):
@@ -99,6 +101,26 @@ class VMSerializer(serializers.ModelSerializer):
         if value is None or value < 1 or value > 20:
             raise serializers.ValidationError('Instance должен быть от 1 до 20.')
         return value
+
+    def validate_ba_pfm_zak(self, value):
+        if not value or not value.strip():
+            raise serializers.ValidationError('БА.ПФМ_зак обязателен.')
+        return value.strip()
+
+    def validate_ba_pfm_isp(self, value):
+        if not value or not value.strip():
+            raise serializers.ValidationError('БА.ПФМ_исп обязателен.')
+        return value.strip()
+
+    def validate_ba_finansovaya_pozitsiya(self, value):
+        if not value or not value.strip():
+            raise serializers.ValidationError('БА.Финансовая_позиция обязательна.')
+        return value.strip()
+
+    def validate_ba_mir_kod(self, value):
+        if not value or not value.strip():
+            raise serializers.ValidationError('БА.Mir-код обязателен.')
+        return value.strip()
 
     def validate_tags(self, value):
         if not isinstance(value, list):

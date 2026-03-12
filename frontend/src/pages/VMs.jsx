@@ -17,6 +17,11 @@ const defaultForm = {
   info_system: '',
   osTag: 'LINUX',
   customTags: [],
+  ba_pfm_zak: 'Z000000',
+  ba_pfm_isp: 'Z000000',
+  ba_programma_byudzheta: '',
+  ba_finansovaya_pozitsiya: '00.00.00.00',
+  ba_mir_kod: 'ITI_000_0000',
 }
 
 export default function VMs() {
@@ -105,6 +110,11 @@ export default function VMs() {
       instance: Number(form.instance) || 1,
       info_system: form.info_system || null,
       tags: buildTags(),
+      ba_pfm_zak: form.ba_pfm_zak.trim(),
+      ba_pfm_isp: form.ba_pfm_isp.trim(),
+      ba_programma_byudzheta: form.ba_programma_byudzheta.trim() || null,
+      ba_finansovaya_pozitsiya: form.ba_finansovaya_pozitsiya.trim(),
+      ba_mir_kod: form.ba_mir_kod.trim(),
     }
     try {
       if (editing) {
@@ -142,6 +152,11 @@ export default function VMs() {
       info_system: isId,
       osTag: (vm.tags && vm.tags[0]) || 'LINUX',
       customTags: custom,
+      ba_pfm_zak: vm.ba_pfm_zak || 'Z000000',
+      ba_pfm_isp: vm.ba_pfm_isp || 'Z000000',
+      ba_programma_byudzheta: vm.ba_programma_byudzheta || '',
+      ba_finansovaya_pozitsiya: vm.ba_finansovaya_pozitsiya || '00.00.00.00',
+      ba_mir_kod: vm.ba_mir_kod || 'ITI_000_0000',
     })
     setCustomInput('')
     setIpWarning('')
@@ -281,6 +296,54 @@ export default function VMs() {
               ))}
             </div>
           </div>
+
+          <h4 style={{ marginTop: '1.5rem', marginBottom: '1rem' }}>Бюджетный учет</h4>
+          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+            <div className="form-group">
+              <label>БА.ПФМ_зак</label>
+              <input
+                value={form.ba_pfm_zak}
+                onChange={(e) => setForm((f) => ({ ...f, ba_pfm_zak: e.target.value }))}
+                placeholder="Z000000"
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label>БА.ПФМ_исп</label>
+              <input
+                value={form.ba_pfm_isp}
+                onChange={(e) => setForm((f) => ({ ...f, ba_pfm_isp: e.target.value }))}
+                placeholder="Z000000"
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label>БА.Программа_бюджета</label>
+              <input
+                value={form.ba_programma_byudzheta}
+                onChange={(e) => setForm((f) => ({ ...f, ba_programma_byudzheta: e.target.value }))}
+                placeholder="Необязательно"
+              />
+            </div>
+            <div className="form-group">
+              <label>БА.Финансовая_позиция</label>
+              <input
+                value={form.ba_finansovaya_pozitsiya}
+                onChange={(e) => setForm((f) => ({ ...f, ba_finansovaya_pozitsiya: e.target.value }))}
+                placeholder="00.00.00.00"
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label>БА.Mir-код</label>
+              <input
+                value={form.ba_mir_kod}
+                onChange={(e) => setForm((f) => ({ ...f, ba_mir_kod: e.target.value }))}
+                placeholder="ITI_000_0000"
+                required
+              />
+            </div>
+          </div>
           {error && <p className="error-msg">{error}</p>}
           <button type="submit" className="btn">{editing ? 'Сохранить' : 'Создать'}</button>
           <button type="button" className="btn btn-secondary" style={{ marginLeft: '0.5rem' }} onClick={() => { setEditing(null); setForm(defaultForm); setShowForm(false); }}>
@@ -306,6 +369,11 @@ export default function VMs() {
                   <th style={{ minWidth: '100px' }}>Instance</th>
                   <th style={{ minWidth: '150px' }}>ИС</th>
                   <th style={{ minWidth: '200px' }}>Код ИС</th>
+                  <th style={{ minWidth: '150px' }}>БА.ПФМ_зак</th>
+                  <th style={{ minWidth: '150px' }}>БА.ПФМ_исп</th>
+                  <th style={{ minWidth: '200px' }}>БА.Программа_бюджета</th>
+                  <th style={{ minWidth: '180px' }}>БА.Финансовая_позиция</th>
+                  <th style={{ minWidth: '180px' }}>БА.Mir-код</th>
                   <th style={{ minWidth: '250px' }}>Теги</th>
                   <th style={{ position: 'sticky', right: 0, background: 'white', zIndex: 1, minWidth: '150px' }}>Действия</th>
                 </tr>
@@ -335,6 +403,11 @@ export default function VMs() {
                       <td style={{ minWidth: '100px' }}>{vm.instance}</td>
                       <td style={{ minWidth: '150px' }}>{vm.info_system_name || '—'}</td>
                       <td style={{ minWidth: '200px' }}>{vm.info_system_code || '—'}</td>
+                      <td style={{ minWidth: '150px' }}>{vm.ba_pfm_zak || 'Z000000'}</td>
+                      <td style={{ minWidth: '150px' }}>{vm.ba_pfm_isp || 'Z000000'}</td>
+                      <td style={{ minWidth: '200px' }}>{vm.ba_programma_byudzheta || '—'}</td>
+                      <td style={{ minWidth: '180px' }}>{vm.ba_finansovaya_pozitsiya || '00.00.00.00'}</td>
+                      <td style={{ minWidth: '180px' }}>{vm.ba_mir_kod || 'ITI_000_0000'}</td>
                       <td style={{ minWidth: '250px' }}>
                         <div className="tags-row">
                           {(vm.tags || []).map((t) => (
