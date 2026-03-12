@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5"
 )
 
 func (a *App) registerVMRoutes(api chi.Router) {
@@ -247,9 +248,34 @@ func (a *App) deleteVM(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := withTimeout(r.Context())
 	defer cancel()
-	ct, err := a.DB.Exec(ctx, `DELETE FROM inventory_vm WHERE id=$1`, id)
-	if err != nil || ct.RowsAffected() == 0 {
+	tx, err := a.DB.Begin(ctx)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		return
+	}
+	defer tx.Rollback(ctx)
+
+	// В существующей БД FK poolvm->vm не всегда с ON DELETE CASCADE.
+	// Явно чистим связи с пулами перед удалением ВМ.
+	if _, err = tx.Exec(ctx, `DELETE FROM inventory_poolvm WHERE vm_id=$1`, id); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+		return
+	}
+	ct, err := tx.Exec(ctx, `DELETE FROM inventory_vm WHERE id=$1`, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			writeJSON(w, http.StatusNotFound, map[string]any{"detail": "Not found."})
+			return
+		}
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+		return
+	}
+	if ct.RowsAffected() == 0 {
 		writeJSON(w, http.StatusNotFound, map[string]any{"detail": "Not found."})
+		return
+	}
+	if err = tx.Commit(ctx); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
