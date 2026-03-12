@@ -12,6 +12,10 @@ def build_report_xlsx():
     wb = Workbook()
     ws = wb.active
     ws.title = "VM Inventory Report"
+    ws.page_setup.orientation = ws.ORIENTATION_LANDSCAPE
+    ws.page_setup.paperSize = ws.PAPERSIZE_A4
+    ws.page_setup.fitToWidth = 1
+    ws.page_setup.fitToHeight = 0
     
     # Заголовок
     ws.merge_cells('A1:M1')
@@ -121,38 +125,38 @@ def build_report_xlsx():
                     stream_sum_ram += sum_ram
                     stream_sum_disk += sum_disk
                 
-                if stream_vm_count > 0:
-                    # Итого Стрим
-                    stream_has_exceeded = (
-                        (stream.cpu_quota > 0 and stream_sum_cpu > stream.cpu_quota)
-                        or (stream.ram_quota > 0 and stream_sum_ram > stream.ram_quota)
-                        or (stream.disk_quota > 0 and stream_sum_disk > stream.disk_quota)
-                    )
-                    stream_tot = f'Итого Стрим: {stream_vm_count} ВМ'
-                    if stream.cpu_quota > 0:
-                        stream_tot += f', CPU: {stream_sum_cpu}/{stream.cpu_quota}'
-                    else:
-                        stream_tot += f', CPU: {stream_sum_cpu}'
-                    if stream.ram_quota > 0:
-                        stream_tot += f', RAM: {stream_sum_ram}/{stream.ram_quota} ГБ'
-                    else:
-                        stream_tot += f', RAM: {stream_sum_ram} ГБ'
-                    if stream.disk_quota > 0:
-                        stream_tot += f', Диск: {stream_sum_disk}/{stream.disk_quota} ГБ'
-                    else:
-                        stream_tot += f', Диск: {stream_sum_disk} ГБ'
-                    ws[f'C{row}'] = f'{"🚨 " if stream_has_exceeded else ""}{stream_tot}'
-                    ws[f'F{row}'] = stream_sum_cpu
-                    ws[f'G{row}'] = stream_sum_ram
-                    ws[f'H{row}'] = stream_sum_disk
-                    ws[f'C{row}'].font = Font(bold=True)
-                    ws[f'C{row}'].fill = stream_fill
-                    row += 1
-                    
-                    dept_vm_count += stream_vm_count
-                    dept_sum_cpu += stream_sum_cpu
-                    dept_sum_ram += stream_sum_ram
-                    dept_sum_disk += stream_sum_disk
+            if stream_vm_count > 0:
+                # Итого Стрим (одна строка на стрим, после всех ИС)
+                stream_has_exceeded = (
+                    (stream.cpu_quota > 0 and stream_sum_cpu > stream.cpu_quota)
+                    or (stream.ram_quota > 0 and stream_sum_ram > stream.ram_quota)
+                    or (stream.disk_quota > 0 and stream_sum_disk > stream.disk_quota)
+                )
+                stream_tot = f'Итого Стрим: {stream_vm_count} ВМ'
+                if stream.cpu_quota > 0:
+                    stream_tot += f', CPU: {stream_sum_cpu}/{stream.cpu_quota}'
+                else:
+                    stream_tot += f', CPU: {stream_sum_cpu}'
+                if stream.ram_quota > 0:
+                    stream_tot += f', RAM: {stream_sum_ram}/{stream.ram_quota} ГБ'
+                else:
+                    stream_tot += f', RAM: {stream_sum_ram} ГБ'
+                if stream.disk_quota > 0:
+                    stream_tot += f', Диск: {stream_sum_disk}/{stream.disk_quota} ГБ'
+                else:
+                    stream_tot += f', Диск: {stream_sum_disk} ГБ'
+                ws[f'C{row}'] = f'{"🚨 " if stream_has_exceeded else ""}{stream_tot}'
+                ws[f'F{row}'] = stream_sum_cpu
+                ws[f'G{row}'] = stream_sum_ram
+                ws[f'H{row}'] = stream_sum_disk
+                ws[f'C{row}'].font = Font(bold=True)
+                ws[f'C{row}'].fill = stream_fill
+                row += 1
+                
+                dept_vm_count += stream_vm_count
+                dept_sum_cpu += stream_sum_cpu
+                dept_sum_ram += stream_sum_ram
+                dept_sum_disk += stream_sum_disk
         
         if dept_vm_count > 0:
             # Проверка превышения квот
