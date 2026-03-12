@@ -33,7 +33,9 @@ class VMSerializer(serializers.ModelSerializer):
         model = VM
         fields = [
             'id', 'fqdn', 'ip', 'cpu', 'ram', 'disk', 'instance', 'tags',
-            'info_system', 'info_system_name', 'info_system_code'
+            'info_system', 'info_system_name', 'info_system_code',
+            'ba_pfm_zak', 'ba_pfm_isp', 'ba_programma_byudzheta',
+            'ba_finansovaya_pozitsiya', 'ba_mir_kod'
         ]
 
     def get_info_system_name(self, obj):

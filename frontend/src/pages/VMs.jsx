@@ -17,6 +17,11 @@ const defaultForm = {
   info_system: '',
   osTag: 'LINUX',
   customTags: [],
+  ba_pfm_zak: 'Z000000',
+  ba_pfm_isp: 'Z000000',
+  ba_programma_byudzheta: '',
+  ba_finansovaya_pozitsiya: '00.00.00.00',
+  ba_mir_kod: 'ITI_000_0000',
 }
 
 export default function VMs() {
@@ -105,6 +110,11 @@ export default function VMs() {
       instance: Number(form.instance) || 1,
       info_system: form.info_system || null,
       tags: buildTags(),
+      ba_pfm_zak: form.ba_pfm_zak,
+      ba_pfm_isp: form.ba_pfm_isp,
+      ba_programma_byudzheta: form.ba_programma_byudzheta || null,
+      ba_finansovaya_pozitsiya: form.ba_finansovaya_pozitsiya,
+      ba_mir_kod: form.ba_mir_kod,
     }
     try {
       if (editing) {
@@ -142,6 +152,11 @@ export default function VMs() {
       info_system: isId,
       osTag: (vm.tags && vm.tags[0]) || 'LINUX',
       customTags: custom,
+      ba_pfm_zak: vm.ba_pfm_zak || 'Z000000',
+      ba_pfm_isp: vm.ba_pfm_isp || 'Z000000',
+      ba_programma_byudzheta: vm.ba_programma_byudzheta || '',
+      ba_finansovaya_pozitsiya: vm.ba_finansovaya_pozitsiya || '00.00.00.00',
+      ba_mir_kod: vm.ba_mir_kod || 'ITI_000_0000',
     })
     setCustomInput('')
     setIpWarning('')
@@ -279,6 +294,59 @@ export default function VMs() {
                   <button type="button" onClick={() => removeCustomTag(t)} aria-label="Удалить">×</button>
                 </span>
               ))}
+            </div>
+          </div>
+
+          <h4 style={{ margin: '1.5rem 0 0.5rem 0', color: '#666' }}>Бюджетный учет</h4>
+
+          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+            <div className="form-group">
+              <label>БА.ПФМ_зак</label>
+              <input
+                value={form.ba_pfm_zak}
+                onChange={(e) => setForm((f) => ({ ...f, ba_pfm_zak: e.target.value }))}
+                placeholder="Z662908"
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label>БА.ПФМ_исп</label>
+              <input
+                value={form.ba_pfm_isp}
+                onChange={(e) => setForm((f) => ({ ...f, ba_pfm_isp: e.target.value }))}
+                placeholder="Z662906"
+                required
+              />
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label>БА.Программа_бюджета</label>
+            <input
+              value={form.ba_programma_byudzheta}
+              onChange={(e) => setForm((f) => ({ ...f, ba_programma_byudzheta: e.target.value }))}
+              placeholder="Необязательное поле"
+            />
+          </div>
+
+          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+            <div className="form-group">
+              <label>БА.Финансовая_позиция</label>
+              <input
+                value={form.ba_finansovaya_pozitsiya}
+                onChange={(e) => setForm((f) => ({ ...f, ba_finansovaya_pozitsiya: e.target.value }))}
+                placeholder="05.03.03.01"
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label>БА.Mir-код</label>
+              <input
+                value={form.ba_mir_kod}
+                onChange={(e) => setForm((f) => ({ ...f, ba_mir_kod: e.target.value }))}
+                placeholder="ITI_075_1505"
+                required
+              />
             </div>
           </div>
           {error && <p className="error-msg">{error}</p>}
