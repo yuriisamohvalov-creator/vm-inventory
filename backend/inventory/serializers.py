@@ -28,12 +28,15 @@ class InfoSystemSerializer(serializers.ModelSerializer):
 class VMSerializer(serializers.ModelSerializer):
     info_system_name = serializers.SerializerMethodField()
     info_system_code = serializers.SerializerMethodField()
+    department_name = serializers.SerializerMethodField()
+    stream_name = serializers.SerializerMethodField()
 
     class Meta:
         model = VM
         fields = [
             'id', 'fqdn', 'ip', 'cpu', 'ram', 'disk', 'instance', 'tags',
-            'info_system', 'info_system_name', 'info_system_code'
+            'info_system', 'info_system_name', 'info_system_code',
+            'department_name', 'stream_name'
         ]
 
     def get_info_system_name(self, obj):
@@ -41,6 +44,16 @@ class VMSerializer(serializers.ModelSerializer):
 
     def get_info_system_code(self, obj):
         return (obj.info_system.code or '').strip() if obj.info_system else ''
+
+    def get_department_name(self, obj):
+        if obj.info_system and obj.info_system.stream and obj.info_system.stream.department:
+            return obj.info_system.stream.department.name
+        return None
+
+    def get_stream_name(self, obj):
+        if obj.info_system and obj.info_system.stream:
+            return obj.info_system.stream.name
+        return None
 
     def validate_fqdn(self, value):
         value = (value or '').strip()

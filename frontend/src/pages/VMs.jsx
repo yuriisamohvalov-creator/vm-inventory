@@ -292,57 +292,77 @@ export default function VMs() {
 
       <div className="card">
         <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>FQDN</th>
-                <th>IP</th>
-                <th>CPU</th>
-                <th>RAM</th>
-                <th>Диск</th>
-                <th>Instance</th>
-                <th>ИС</th>
-                <th>Теги</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {list.map((vm) => (
-                <tr key={vm.id}>
-                  <td>{vm.fqdn}</td>
-                  <td>{vm.ip || '000.000.000.000'}</td>
-                  <td>{vm.cpu}</td>
-                  <td>{vm.ram}</td>
-                  <td>{vm.disk}</td>
-                  <td>{vm.instance}</td>
-                  <td>{vm.info_system_name || '—'}</td>
-                  <td>
-                    <div className="tags-row">
-                      {(vm.tags || []).map((t) => (
-                        <span key={t} className="badge">{t}</span>
-                      ))}
-                    </div>
-                  </td>
-                  <td>
-                    <button className="btn btn-sm btn-secondary" onClick={() => startEdit(vm)}>Редактировать</button>
-                    <button
-                      className="btn btn-sm btn-danger"
-                      style={{ marginLeft: '0.5rem' }}
-                      onClick={async () => {
-                        if (!confirm('Удалить ВМ?')) return
-                        try {
-                          await api.vms.delete(vm.id)
-                          load()
-                        } catch (_) {}
-                      }}
-                    >
-                      Удалить
-                    </button>
-                  </td>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ minWidth: '1000px', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr>
+                  <th style={{ position: 'sticky', left: 0, background: 'white', zIndex: 1, minWidth: '250px' }}>FQDN</th>
+                  <th style={{ minWidth: '150px' }}>Департамент</th>
+                  <th style={{ minWidth: '150px' }}>Стрим</th>
+                  <th style={{ minWidth: '150px' }}>IP</th>
+                  <th style={{ minWidth: '100px' }}>CPU</th>
+                  <th style={{ minWidth: '100px' }}>RAM</th>
+                  <th style={{ minWidth: '100px' }}>Диск</th>
+                  <th style={{ minWidth: '100px' }}>Instance</th>
+                  <th style={{ minWidth: '150px' }}>ИС</th>
+                  <th style={{ minWidth: '200px' }}>Код ИС</th>
+                  <th style={{ minWidth: '250px' }}>Теги</th>
+                  <th style={{ position: 'sticky', right: 0, background: 'white', zIndex: 1, minWidth: '150px' }}>Действия</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {list
+                  .sort((a, b) => {
+                    // Sort by department first
+                    const deptA = a.department_name || 'ZZZ'
+                    const deptB = b.department_name || 'ZZZ'
+                    if (deptA !== deptB) return deptA.localeCompare(deptB)
+
+                    // Then by stream
+                    const streamA = a.stream_name || 'ZZZ'
+                    const streamB = b.stream_name || 'ZZZ'
+                    return streamA.localeCompare(streamB)
+                  })
+                  .map((vm) => (
+                    <tr key={vm.id}>
+                      <td style={{ position: 'sticky', left: 0, background: 'white', minWidth: '250px' }}>{vm.fqdn}</td>
+                      <td style={{ minWidth: '150px' }}>{vm.department_name || '—'}</td>
+                      <td style={{ minWidth: '150px' }}>{vm.stream_name || '—'}</td>
+                      <td style={{ minWidth: '150px' }}>{vm.ip || '000.000.000.000'}</td>
+                      <td style={{ minWidth: '100px' }}>{vm.cpu}</td>
+                      <td style={{ minWidth: '100px' }}>{vm.ram}</td>
+                      <td style={{ minWidth: '100px' }}>{vm.disk}</td>
+                      <td style={{ minWidth: '100px' }}>{vm.instance}</td>
+                      <td style={{ minWidth: '150px' }}>{vm.info_system_name || '—'}</td>
+                      <td style={{ minWidth: '200px' }}>{vm.info_system_code || '—'}</td>
+                      <td style={{ minWidth: '250px' }}>
+                        <div className="tags-row">
+                          {(vm.tags || []).map((t) => (
+                            <span key={t} className="badge">{t}</span>
+                          ))}
+                        </div>
+                      </td>
+                      <td style={{ position: 'sticky', right: 0, background: 'white', minWidth: '150px' }}>
+                        <button className="btn btn-sm btn-secondary" onClick={() => startEdit(vm)}>Редактировать</button>
+                        <button
+                          className="btn btn-sm btn-danger"
+                          style={{ marginLeft: '0.5rem' }}
+                          onClick={async () => {
+                            if (!confirm('Удалить ВМ?')) return
+                            try {
+                              await api.vms.delete(vm.id)
+                              load()
+                            } catch (_) {}
+                          }}
+                        >
+                          Удалить
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </>

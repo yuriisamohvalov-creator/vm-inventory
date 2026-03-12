@@ -156,10 +156,35 @@ th {
   font-weight: 600;
   color: var(--text-muted);
   font-size: 0.85rem;
+  position: sticky;
+  top: 0;
+  background: var(--card-bg);
+  z-index: 2;
 }
 
 tr:hover td {
   background: rgba(255,255,255,0.03);
+}
+
+/* Sticky table cells */
+td[style*="position: sticky"] {
+  position: sticky;
+  background: var(--card-bg);
+  box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+  z-index: 1;
+}
+
+td[style*="position: sticky"]:first-child {
+  left: 0;
+}
+
+td[style*="position: sticky"]:last-child {
+  right: 0;
+}
+
+/* Ensure proper layering */
+th {
+  z-index: 3 !important;
 }
 
 .badge {
