@@ -3,27 +3,25 @@ package app
 import (
 	"bytes"
 	"fmt"
+	"os"
 
 	"github.com/jung-kurt/gofpdf/v2"
 	"github.com/xuri/excelize/v2"
 )
 
 func BuildPDFReport(data []ReportDepartment) ([]byte, error) {
-	pdf := gofpdf.NewCustom(&gofpdf.InitType{
-		OrientationStr: "L",
-		UnitStr:        "mm",
-		SizeStr:        "A4",
-	})
+	pdf := gofpdf.New("L", "mm", "A4", "")
 	pdf.AddPage()
-	pdf.SetFont("Helvetica", "B", 14)
+	font := ensurePDFFont(pdf)
+	pdf.SetFont(font, "", 14)
 	pdf.Cell(0, 8, "VM Inventory - Report")
 	pdf.Ln(10)
 
 	for _, dept := range data {
-		pdf.SetFont("Helvetica", "B", 11)
+		pdf.SetFont(font, "", 11)
 		deptLine := dept.Name
 		if dept.ID != nil {
-			deptLine = fmt.Sprintf("%s (VM: %d, CPU: %d", dept.Name, dept.VMCount, dept.SumCPU)
+			deptLine = fmt.Sprintf("%s (ВМ: %d, CPU: %d", dept.Name, dept.VMCount, dept.SumCPU)
 			if dept.CPUQuota > 0 {
 				deptLine += fmt.Sprintf("/%d", dept.CPUQuota)
 			}
@@ -31,20 +29,19 @@ func BuildPDFReport(data []ReportDepartment) ([]byte, error) {
 			if dept.RAMQuota > 0 {
 				deptLine += fmt.Sprintf("/%d", dept.RAMQuota)
 			}
-			deptLine += fmt.Sprintf(" GB, Disk: %d", dept.SumDisk)
+			deptLine += fmt.Sprintf(" ГБ, Диск: %d", dept.SumDisk)
 			if dept.DiskQuota > 0 {
 				deptLine += fmt.Sprintf("/%d", dept.DiskQuota)
 			}
-			deptLine += " GB)"
+			deptLine += " ГБ)"
 		}
 		if dept.HasExceeded {
 			deptLine = "!! " + deptLine
 		}
-		pdf.Cell(0, 7, deptLine)
-		pdf.Ln(7)
+		pdf.MultiCell(0, 6, deptLine, "", "L", false)
 		for _, stream := range dept.Streams {
-			pdf.SetFont("Helvetica", "", 10)
-			streamLine := fmt.Sprintf("  %s (%d VM, CPU %d", stream.Name, stream.VMCount, stream.SumCPU)
+			pdf.SetFont(font, "", 10)
+			streamLine := fmt.Sprintf("  %s (%d ВМ, CPU %d", stream.Name, stream.VMCount, stream.SumCPU)
 			if stream.CPUQuota > 0 {
 				streamLine += fmt.Sprintf("/%d", stream.CPUQuota)
 			}
@@ -52,27 +49,22 @@ func BuildPDFReport(data []ReportDepartment) ([]byte, error) {
 			if stream.RAMQuota > 0 {
 				streamLine += fmt.Sprintf("/%d", stream.RAMQuota)
 			}
-			streamLine += fmt.Sprintf(" GB, Disk %d", stream.SumDisk)
+			streamLine += fmt.Sprintf(" ГБ, Диск %d", stream.SumDisk)
 			if stream.DiskQuota > 0 {
 				streamLine += fmt.Sprintf("/%d", stream.DiskQuota)
 			}
-			streamLine += " GB)"
+			streamLine += " ГБ)"
 			if stream.HasExceeded {
 				streamLine = "  !! " + streamLine
 			}
-			pdf.Cell(0, 6, streamLine)
-			pdf.Ln(6)
+			pdf.MultiCell(0, 5, streamLine, "", "L", false)
 			for _, isys := range stream.InfoSystems {
-				pdf.SetFont("Helvetica", "", 9)
-				pdf.Cell(0, 5, "    "+isys.Name)
-				pdf.Ln(5)
+				pdf.SetFont(font, "", 9)
+				pdf.MultiCell(0, 4.5, "    "+isys.Name, "", "L", false)
 				for _, vm := range isys.VMs {
-					pdf.Cell(0, 4, fmt.Sprintf("      - %s (%s) CPU:%d RAM:%dGB Disk:%dGB", vm.FQDN, vm.IP, vm.CPU, vm.RAM, vm.Disk))
-					pdf.Ln(4)
-					pdf.Cell(0, 4, fmt.Sprintf("        BA.PFM_zak:%s BA.PFM_isp:%s BA.Program:%s", vm.BAPFMZak, vm.BAPFMIsp, safeString(vm.BAProgrammaByudzheta)))
-					pdf.Ln(4)
-					pdf.Cell(0, 4, fmt.Sprintf("        BA.Position:%s BA.Mir:%s", vm.BAFinansovayaPozitsiya, vm.BAMirKod))
-					pdf.Ln(4)
+					pdf.MultiCell(0, 4, fmt.Sprintf("      - %s (%s) CPU:%d RAM:%dГБ Диск:%dГБ", vm.FQDN, vm.IP, vm.CPU, vm.RAM, vm.Disk), "", "L", false)
+					pdf.MultiCell(0, 4, fmt.Sprintf("        БА.ПФМ_зак:%s  БА.ПФМ_исп:%s  БА.Программа_бюджета:%s", vm.BAPFMZak, vm.BAPFMIsp, safeString(vm.BAProgrammaByudzheta)), "", "L", false)
+					pdf.MultiCell(0, 4, fmt.Sprintf("        БА.Финансовая_позиция:%s  БА.Mir-код:%s", vm.BAFinansovayaPozitsiya, vm.BAMirKod), "", "L", false)
 				}
 			}
 		}
@@ -169,3 +161,20 @@ func safeString(v *string) string {
 }
 
 func stringPtr(v string) *string { return &v }
+
+func ensurePDFFont(pdf *gofpdf.Fpdf) string {
+	paths := []string{
+		"/usr/share/fonts/dejavu/DejaVuSans.ttf",
+		"/usr/share/fonts/TTF/DejaVuSans.ttf",
+		"/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+	}
+	for _, p := range paths {
+		if _, err := os.Stat(p); err == nil {
+			pdf.AddUTF8Font("DejaVu", "", p)
+			if !pdf.Err() {
+				return "DejaVu"
+			}
+		}
+	}
+	return "Helvetica"
+}
