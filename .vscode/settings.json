@@ -1,0 +1,8 @@
+{
+    "python.pythonPath": ".venv/bin/python",
+    "python.analysis.extraPaths": [
+        "backend"
+    ],
+    "python.linting.pylintEnabled": true,
+    "python.linting.enabled": true
+}
