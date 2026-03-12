@@ -1,0 +1,10 @@
+version: "2"
+sql:
+  - engine: "postgresql"
+    schema: "db/migrations/00001_init_inventory.sql"
+    queries: "db/queries"
+    gen:
+      go:
+        package: "dbsqlc"
+        out: "internal/dbsqlc"
+        sql_package: "pgx/v5"
