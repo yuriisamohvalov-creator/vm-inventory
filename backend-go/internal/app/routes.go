@@ -22,6 +22,8 @@ func (a *App) RegisterRoutes(r chi.Router) {
 		api.Get("/", func(w http.ResponseWriter, _ *http.Request) {
 			writeJSON(w, http.StatusOK, map[string]any{"status": "ok"})
 		})
+		api.Use(a.authMiddleware)
+		a.registerAuthRoutes(api)
 		a.registerDepartmentRoutes(api)
 		a.registerStreamRoutes(api)
 		a.registerInfoSystemRoutes(api)

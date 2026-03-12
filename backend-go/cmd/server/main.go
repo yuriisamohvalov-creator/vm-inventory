@@ -31,6 +31,9 @@ func main() {
 	if err := application.RunMigrations(ctx, "db/migrations", cfg.DatabaseURL); err != nil {
 		log.Fatalf("run migrations: %v", err)
 	}
+	if err := application.EnsureAuthBootstrap(ctx); err != nil {
+		log.Fatalf("bootstrap auth: %v", err)
+	}
 
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)

@@ -14,7 +14,8 @@ import (
 )
 
 type App struct {
-	DB *pgxpool.Pool
+	DB  *pgxpool.Pool
+	Cfg Config
 }
 
 func NewApp(ctx context.Context, cfg Config) (*App, error) {
@@ -31,7 +32,7 @@ func NewApp(ctx context.Context, cfg Config) (*App, error) {
 		pool.Close()
 		return nil, fmt.Errorf("ping db: %w", err)
 	}
-	return &App{DB: pool}, nil
+	return &App{DB: pool, Cfg: cfg}, nil
 }
 
 func (a *App) Close() {

@@ -1,13 +1,28 @@
 const API = '/api';
+const TOKEN_KEY = 'vm_inventory_token';
+
+function getAuthToken() {
+  return localStorage.getItem(TOKEN_KEY) || '';
+}
+
+function setAuthToken(token) {
+  if (token) localStorage.setItem(TOKEN_KEY, token);
+  else localStorage.removeItem(TOKEN_KEY);
+}
 
 async function request(path, options = {}) {
   const url = path.startsWith('http') ? path : `${API}${path}`;
+  const token = getAuthToken();
+  const headers = {
+    'Content-Type': 'application/json',
+    ...options.headers,
+  };
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
   const res = await fetch(url, {
     ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
+    headers,
   });
   if (!res.ok) {
     const err = new Error(res.statusText);
@@ -26,6 +41,36 @@ async function request(path, options = {}) {
 }
 
 export const api = {
+  getAuthToken,
+  setAuthToken,
+  auth: {
+    login: async (username, password) => {
+      const response = await request('/auth/login/', {
+        method: 'POST',
+        body: JSON.stringify({ username, password }),
+      });
+      if (response?.token) setAuthToken(response.token);
+      return response;
+    },
+    me: () => request('/auth/me/'),
+    logout: async () => {
+      try {
+        await request('/auth/logout/', { method: 'POST' });
+      } finally {
+        setAuthToken('');
+      }
+    },
+    changePassword: (currentPassword, newPassword) =>
+      request('/auth/change-password/', {
+        method: 'POST',
+        body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+      }),
+    users: {
+      list: () => request('/auth/users/'),
+      create: (data) => request('/auth/users/', { method: 'POST', body: JSON.stringify(data) }),
+      update: (id, data) => request(`/auth/users/${id}/`, { method: 'PATCH', body: JSON.stringify(data) }),
+    },
+  },
   departments: {
     list: () => request('/departments/'),
     get: (id) => request(`/departments/${id}/`),

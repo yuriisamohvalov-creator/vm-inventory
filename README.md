@@ -74,6 +74,12 @@ vm-inventory/
 - `DEBUG` — режим отладки (`true`/`false`)
 - `ALLOWED_HOSTS` — разрешенные хосты (через запятую)
 
+### Auth / RBAC
+- `AUTH_BOOTSTRAP_USERNAME` — логин первого локального пользователя (по умолчанию `admin`)
+- `AUTH_BOOTSTRAP_PASSWORD` — пароль первого локального пользователя (по умолчанию `P@ssw0rD`)
+- `AUTH_BOOTSTRAP_ROLE` — роль bootstrap-пользователя: `admin` или `analyst`
+- `AUTH_TOKEN_TTL_MINUTES` — время жизни bearer-токена в минутах
+
 ### LDAP (опционально)
 - `LDAP_URI` — URI LDAP сервера (если пусто — no-auth)
 - `LDAP_BIND_DN` — DN для привязки
@@ -138,9 +144,14 @@ npm run dev
 
 ## Безопасность
 
-- По умолчанию аутентификация отключена (no-auth)
+- В Go backend включена ролевая модель:
+  - `admin` — полный доступ
+  - `analyst` — доступ только на чтение, включая экспорт отчётов
+- Пользователи хранятся локально в БД (`auth_user`)
+- При пустой таблице пользователей создаётся bootstrap-аккаунт `admin` с паролем из `AUTH_BOOTSTRAP_PASSWORD` и флагом обязательной смены пароля при первом входе
 - Для продакшена рекомендуется:
-  - Настроить LDAP (см. `docs/DEPLOYMENT.md`)
+  - Изменить `AUTH_BOOTSTRAP_PASSWORD`
+  - Настроить LDAP (подготовлена таблица `auth_ldap_group_role_map` для сопоставления LDAP-групп и ролей)
   - Использовать HTTPS (см. `docs/DEPLOYMENT.md`)
   - Изменить `SECRET_KEY`
   - Установить `DEBUG=false`

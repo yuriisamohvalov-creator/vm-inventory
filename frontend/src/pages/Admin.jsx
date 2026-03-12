@@ -12,7 +12,7 @@ const INITIAL_FORM = {
   disk_quota: 0,
 }
 
-export default function Admin() {
+export default function Admin({ canWrite = false, userRole = '' }) {
   const [departments, setDepartments] = useState([])
   const [streams, setStreams] = useState([])
   const [infoSystems, setInfoSystems] = useState([])
@@ -62,6 +62,7 @@ export default function Admin() {
 
   const handleSave = async (e) => {
     e.preventDefault()
+    if (!canWrite) return
     setError('')
     try {
       if (tab === 'departments') {
@@ -97,6 +98,7 @@ export default function Admin() {
   }
 
   const handleDelete = async (tabName, id) => {
+    if (!canWrite) return
     if (!confirm('Удалить?')) return
     setError('')
     try {
@@ -141,6 +143,11 @@ export default function Admin() {
   return (
     <>
       <h1 className="page-title">Администрирование</h1>
+      {!canWrite && (
+        <p className="empty-hint" style={{ padding: 0, marginTop: '-1rem' }}>
+          Роль {userRole}: доступ только на чтение.
+        </p>
+      )}
       <div className="card">
         <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
           {['departments', 'streams', 'info-systems'].map((t) => (
@@ -157,6 +164,7 @@ export default function Admin() {
           ))}
         </div>
 
+        {canWrite && (
         <form onSubmit={handleSave}>
           <div className="form-group">
             <label>Название</label>
@@ -305,6 +313,7 @@ export default function Admin() {
             </button>
           )}
         </form>
+        )}
       </div>
 
       <div className="card">
@@ -331,10 +340,12 @@ export default function Admin() {
                     getDepartmentStreamSums(d).ram > toNum(d.ram_quota) ||
                     getDepartmentStreamSums(d).disk > toNum(d.disk_quota)
                   )) && <span className="warning-msg-inline"> Превышение квот департамента</span>}
-                  <span className="tree-actions" onClick={(e) => e.stopPropagation()}>
-                    <button type="button" className="btn btn-sm btn-secondary" onClick={() => startEdit(d, 'departments')}>Изменить</button>
-                    <button type="button" className="btn btn-sm btn-danger" style={{ marginLeft: '0.5rem' }} onClick={() => handleDelete('departments', d.id)}>Удалить</button>
-                  </span>
+                  {canWrite && (
+                    <span className="tree-actions" onClick={(e) => e.stopPropagation()}>
+                      <button type="button" className="btn btn-sm btn-secondary" onClick={() => startEdit(d, 'departments')}>Изменить</button>
+                      <button type="button" className="btn btn-sm btn-danger" style={{ marginLeft: '0.5rem' }} onClick={() => handleDelete('departments', d.id)}>Удалить</button>
+                    </span>
+                  )}
                 </div>
                 {expandedDepts.has(d.id) && streams.filter((s) => s.department === d.id).map((s) => (
                   <div key={s.id} className="tree-child">
@@ -347,20 +358,24 @@ export default function Admin() {
                       <span className="tree-muted">
                         {' '}| Квота: CPU {toNum(s.cpu_quota)}, RAM {toNum(s.ram_quota)}, DISK {toNum(s.disk_quota)}
                       </span>
-                      <span className="tree-actions" onClick={(e) => e.stopPropagation()}>
-                        <button type="button" className="btn btn-sm btn-secondary" onClick={() => startEdit(s, 'streams')}>Изменить</button>
-                        <button type="button" className="btn btn-sm btn-danger" style={{ marginLeft: '0.5rem' }} onClick={() => handleDelete('streams', s.id)}>Удалить</button>
-                      </span>
+                      {canWrite && (
+                        <span className="tree-actions" onClick={(e) => e.stopPropagation()}>
+                          <button type="button" className="btn btn-sm btn-secondary" onClick={() => startEdit(s, 'streams')}>Изменить</button>
+                          <button type="button" className="btn btn-sm btn-danger" style={{ marginLeft: '0.5rem' }} onClick={() => handleDelete('streams', s.id)}>Удалить</button>
+                        </span>
+                      )}
                     </div>
                     {expandedStreams.has(s.id) && infoSystems.filter((is) => is.stream === s.id).map((isys) => (
                       <div key={isys.id} className="tree-child tree-row tree-row-is">
                         <span className="tree-toggle tree-toggle-empty" />
                         <span>{isys.name}</span>
                         {isys.code && <span className="tree-muted"> [{isys.code}]</span>}
-                        <span className="tree-actions">
-                          <button type="button" className="btn btn-sm btn-secondary" onClick={() => startEdit(isys, 'info-systems')}>Изменить</button>
-                          <button type="button" className="btn btn-sm btn-danger" style={{ marginLeft: '0.5rem' }} onClick={() => handleDelete('info-systems', isys.id)}>Удалить</button>
-                        </span>
+                        {canWrite && (
+                          <span className="tree-actions">
+                            <button type="button" className="btn btn-sm btn-secondary" onClick={() => startEdit(isys, 'info-systems')}>Изменить</button>
+                            <button type="button" className="btn btn-sm btn-danger" style={{ marginLeft: '0.5rem' }} onClick={() => handleDelete('info-systems', isys.id)}>Удалить</button>
+                          </span>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -382,20 +397,24 @@ export default function Admin() {
                   <span>{s.name}</span>
                   <span className="tree-muted"> — {departments.find((d) => d.id === s.department)?.name || ''}</span>
                   <span className="tree-muted"> | Квота: CPU {toNum(s.cpu_quota)}, RAM {toNum(s.ram_quota)}, DISK {toNum(s.disk_quota)}</span>
-                  <span className="tree-actions" onClick={(e) => e.stopPropagation()}>
-                    <button type="button" className="btn btn-sm btn-secondary" onClick={() => startEdit(s, 'streams')}>Изменить</button>
-                    <button type="button" className="btn btn-sm btn-danger" style={{ marginLeft: '0.5rem' }} onClick={() => handleDelete('streams', s.id)}>Удалить</button>
-                  </span>
+                  {canWrite && (
+                    <span className="tree-actions" onClick={(e) => e.stopPropagation()}>
+                      <button type="button" className="btn btn-sm btn-secondary" onClick={() => startEdit(s, 'streams')}>Изменить</button>
+                      <button type="button" className="btn btn-sm btn-danger" style={{ marginLeft: '0.5rem' }} onClick={() => handleDelete('streams', s.id)}>Удалить</button>
+                    </span>
+                  )}
                 </div>
                 {expandedStreams.has(s.id) && infoSystems.filter((is) => is.stream === s.id).map((isys) => (
                   <div key={isys.id} className="tree-child tree-row tree-row-is">
                     <span className="tree-toggle tree-toggle-empty" />
                     <span>{isys.name}</span>
                     {isys.code && <span className="tree-muted"> [{isys.code}]</span>}
-                    <span className="tree-actions">
-                      <button type="button" className="btn btn-sm btn-secondary" onClick={() => startEdit(isys, 'info-systems')}>Изменить</button>
-                      <button type="button" className="btn btn-sm btn-danger" style={{ marginLeft: '0.5rem' }} onClick={() => handleDelete('info-systems', isys.id)}>Удалить</button>
-                    </span>
+                    {canWrite && (
+                      <span className="tree-actions">
+                        <button type="button" className="btn btn-sm btn-secondary" onClick={() => startEdit(isys, 'info-systems')}>Изменить</button>
+                        <button type="button" className="btn btn-sm btn-danger" style={{ marginLeft: '0.5rem' }} onClick={() => handleDelete('info-systems', isys.id)}>Удалить</button>
+                      </span>
+                    )}
                   </div>
                 ))}
               </div>
@@ -416,8 +435,12 @@ export default function Admin() {
                     <td>{isys.is_id || '—'}</td>
                     <td>{isys.stream_name}</td>
                     <td>
-                      <button className="btn btn-sm btn-secondary" onClick={() => startEdit(isys, 'info-systems')}>Изменить</button>
-                      <button className="btn btn-sm btn-danger" style={{ marginLeft: '0.5rem' }} onClick={() => handleDelete('info-systems', isys.id)}>Удалить</button>
+                      {canWrite ? (
+                        <>
+                          <button className="btn btn-sm btn-secondary" onClick={() => startEdit(isys, 'info-systems')}>Изменить</button>
+                          <button className="btn btn-sm btn-danger" style={{ marginLeft: '0.5rem' }} onClick={() => handleDelete('info-systems', isys.id)}>Удалить</button>
+                        </>
+                      ) : '—'}
                     </td>
                   </tr>
                 ))}

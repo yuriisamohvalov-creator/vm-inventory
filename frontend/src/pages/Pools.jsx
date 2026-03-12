@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { api } from '../api'
 
-export default function Pools() {
+export default function Pools({ canWrite = false }) {
   const [pools, setPools] = useState([])
   const [composition, setComposition] = useState(null)
   const [availableVms, setAvailableVms] = useState([])
@@ -96,7 +96,7 @@ export default function Pools() {
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
           <span>Список пулов</span>
-          <button className="btn" onClick={() => setShowCreate(true)}>Создать пул</button>
+          {canWrite && <button className="btn" onClick={() => setShowCreate(true)}>Создать пул</button>}
         </div>
 
         {showCreate && (
@@ -136,7 +136,7 @@ export default function Pools() {
                   <td>{p.created_at ? new Date(p.created_at).toLocaleString() : '—'}</td>
                   <td>
                     <button className="btn btn-sm btn-secondary" onClick={() => openComposition(p)}>Состав</button>
-                    <button className="btn btn-sm btn-danger" style={{ marginLeft: '0.5rem' }} onClick={() => deletePool(p)}>Удалить</button>
+                    {canWrite && <button className="btn btn-sm btn-danger" style={{ marginLeft: '0.5rem' }} onClick={() => deletePool(p)}>Удалить</button>}
                   </td>
                 </tr>
               ))}
@@ -166,7 +166,7 @@ export default function Pools() {
                       <li key={vm.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <span>{vm.fqdn} (instance {vm.instance})</span>
-                          <button type="button" className="btn btn-sm" onClick={() => addVm(vm.id)}>Добавить →</button>
+                          {canWrite && <button type="button" className="btn btn-sm" onClick={() => addVm(vm.id)}>Добавить →</button>}
                         </div>
                         <div className="tags-row" style={{ fontSize: '0.8rem' }}>
                           {(vm.tags || []).map((t) => (
@@ -189,7 +189,7 @@ export default function Pools() {
                       <li key={v.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <span>{v.fqdn}</span>
-                          <button type="button" className="btn btn-sm btn-danger" onClick={() => removeVm(v.id)}>Убрать</button>
+                          {canWrite && <button type="button" className="btn btn-sm btn-danger" onClick={() => removeVm(v.id)}>Убрать</button>}
                         </div>
                         {poolDetail?.pool_tags && (
                           <div className="tags-row" style={{ fontSize: '0.8rem' }}>
