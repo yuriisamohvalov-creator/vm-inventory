@@ -62,9 +62,11 @@ func BuildPDFReport(data []ReportDepartment) ([]byte, error) {
 				pdf.SetFont(font, "", 9)
 				pdf.MultiCell(0, 4.5, "    "+isys.Name, "", "L", false)
 				for _, vm := range isys.VMs {
-					pdf.MultiCell(0, 4, fmt.Sprintf("      - %s (%s) CPU:%d RAM:%dГБ Диск:%dГБ", vm.FQDN, vm.IP, vm.CPU, vm.RAM, vm.Disk), "", "L", false)
-					pdf.MultiCell(0, 4, fmt.Sprintf("        БА.ПФМ_зак:%s  БА.ПФМ_исп:%s  БА.Программа_бюджета:%s", vm.BAPFMZak, vm.BAPFMIsp, safeString(vm.BAProgrammaByudzheta)), "", "L", false)
-					pdf.MultiCell(0, 4, fmt.Sprintf("        БА.Финансовая_позиция:%s  БА.Mir-код:%s", vm.BAFinansovayaPozitsiya, vm.BAMirKod), "", "L", false)
+					if pdf.GetY() > 190 {
+						pdf.AddPage()
+					}
+					drawVMCoreRow(pdf, vm)
+					drawVMBudgetRow(pdf, vm)
 				}
 			}
 		}
@@ -162,15 +164,36 @@ func safeString(v *string) string {
 
 func stringPtr(v string) *string { return &v }
 
+func drawVMCoreRow(pdf *gofpdf.Fpdf, vm ReportVM) {
+	pdf.SetFontSize(8.5)
+	pdf.SetX(16)
+	pdf.CellFormat(92, 4.5, vm.FQDN, "1", 0, "L", false, 0, "")
+	pdf.CellFormat(34, 4.5, vm.IP, "1", 0, "L", false, 0, "")
+	pdf.CellFormat(14, 4.5, fmt.Sprintf("%d", vm.CPU), "1", 0, "C", false, 0, "")
+	pdf.CellFormat(14, 4.5, fmt.Sprintf("%d", vm.RAM), "1", 0, "C", false, 0, "")
+	pdf.CellFormat(16, 4.5, fmt.Sprintf("%d", vm.Disk), "1", 1, "C", false, 0, "")
+}
+
+func drawVMBudgetRow(pdf *gofpdf.Fpdf, vm ReportVM) {
+	pdf.SetFontSize(8)
+	pdf.SetX(28)
+	pdf.CellFormat(34, 4.3, "ПФМ_зак: "+vm.BAPFMZak, "1", 0, "L", false, 0, "")
+	pdf.CellFormat(34, 4.3, "ПФМ_исп: "+vm.BAPFMIsp, "1", 0, "L", false, 0, "")
+	pdf.CellFormat(58, 4.3, "Программа: "+safeString(vm.BAProgrammaByudzheta), "1", 0, "L", false, 0, "")
+	pdf.CellFormat(52, 4.3, "Фин.позиция: "+vm.BAFinansovayaPozitsiya, "1", 0, "L", false, 0, "")
+	pdf.CellFormat(50, 4.3, "Mir-код: "+vm.BAMirKod, "1", 1, "L", false, 0, "")
+}
+
 func ensurePDFFont(pdf *gofpdf.Fpdf) string {
 	paths := []string{
+		"/app/fonts/DejaVuSans.ttf",
 		"/usr/share/fonts/dejavu/DejaVuSans.ttf",
 		"/usr/share/fonts/TTF/DejaVuSans.ttf",
 		"/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
 	}
 	for _, p := range paths {
 		if _, err := os.Stat(p); err == nil {
-			pdf.AddUTF8Font("DejaVu", "", p)
+			pdf.AddUTF8Font("DejaVu", "", "fonts/DejaVuSans.ttf")
 			if !pdf.Err() {
 				return "DejaVu"
 			}
