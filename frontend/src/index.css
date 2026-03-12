@@ -177,6 +177,22 @@ tr:hover td {
   margin-bottom: 1rem;
 }
 
+.form-row {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.form-row .form-group {
+  flex: 1 1 180px;
+  min-width: 160px;
+}
+
+.form-row .form-group input,
+.form-row .form-group select {
+  max-width: none;
+}
+
 .form-group label {
   display: block;
   margin-bottom: 0.35rem;

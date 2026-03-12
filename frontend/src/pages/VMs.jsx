@@ -265,30 +265,30 @@ export default function VMs() {
       <div className="card">
         <h3 style={{ marginTop: 0 }}>{editing ? 'Редактировать ВМ' : 'Добавить ВМ'}</h3>
         <form onSubmit={handleSave}>
-          <div className="form-group">
-            <label>FQDN</label>
-            <input
-              value={form.fqdn}
-              onChange={(e) => setForm((f) => ({ ...f, fqdn: e.target.value }))}
-              placeholder="p0ppor-agc001lk.inno.local"
-              required
-            />
-          </div>
-          <div className="form-group">
-            <label>IP адрес</label>
-            <input
-              value={form.ip}
-              onChange={(e) => {
-                const newIp = e.target.value
-                setForm((f) => ({ ...f, ip: newIp }))
-                checkIpDuplicate(newIp)
-              }}
-              placeholder="000.000.000.000"
-              required
-            />
-            {ipWarning && <p className="error-msg" style={{ marginTop: '0.25rem', fontSize: '0.9rem' }}>{ipWarning}</p>}
-          </div>
-          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+          <div className="form-row">
+            <div className="form-group">
+              <label>FQDN</label>
+              <input
+                value={form.fqdn}
+                onChange={(e) => setForm((f) => ({ ...f, fqdn: e.target.value }))}
+                placeholder="p0ppor-agc001lk.inno.local"
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label>IP адрес</label>
+              <input
+                value={form.ip}
+                onChange={(e) => {
+                  const newIp = e.target.value
+                  setForm((f) => ({ ...f, ip: newIp }))
+                  checkIpDuplicate(newIp)
+                }}
+                placeholder="000.000.000.000"
+                required
+              />
+              {ipWarning && <p className="error-msg" style={{ marginTop: '0.25rem', fontSize: '0.9rem' }}>{ipWarning}</p>}
+            </div>
             <div className="form-group">
               <label>CPU (ядра)</label>
               <input type="number" min={1} value={form.cpu} onChange={(e) => setForm((f) => ({ ...f, cpu: e.target.value }))} />
@@ -309,71 +309,73 @@ export default function VMs() {
                 ))}
               </select>
             </div>
-          </div>
-          <div className="form-group">
-            <label>Информационная система</label>
-            <select
-              value={form.info_system}
-              onChange={(e) => setForm((f) => ({ ...f, info_system: e.target.value || '' }))}
-            >
-              <option value="">— не выбрана —</option>
-              {infoSystems.map((is) => (
-                <option key={is.id} value={is.id}>{is.name}{is.code ? ` [${is.code}]` : ''} ({is.stream_name})</option>
-              ))}
-            </select>
-          </div>
-          <div className="form-group">
-            <label>ОС (тег)</label>
-            <div style={{ display: 'flex', gap: '1rem' }}>
-              {OS_OPTIONS.map((o) => (
-                <label key={o.value}>
-                  <input
-                    type="radio"
-                    name="os"
-                    value={o.value}
-                    checked={form.osTag === o.value}
-                    onChange={() => setForm((f) => ({ ...f, osTag: o.value }))}
-                  /> {o.label}
-                </label>
-              ))}
+            <div className="form-group">
+              <label>Информационная система</label>
+              <select
+                value={form.info_system}
+                onChange={(e) => setForm((f) => ({ ...f, info_system: e.target.value || '' }))}
+              >
+                <option value="">— не выбрана —</option>
+                {infoSystems.map((is) => (
+                  <option key={is.id} value={is.id}>{is.name}{is.code ? ` [${is.code}]` : ''} ({is.stream_name})</option>
+                ))}
+              </select>
             </div>
           </div>
-          <div className="form-group">
-            <label>Тег ИС (код, авто)</label>
-            <input
-              value={
-                form.info_system
-                  ? (infoSystems.find((is) => is.id === form.info_system)?.code || '').toString().trim().toUpperCase().replace(/\s/g, '_') || '—'
-                  : '—'
-              }
-              disabled
-            />
-          </div>
-          <div className="form-group">
-            <label>Кастомные теги</label>
-            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <div className="form-row">
+            <div className="form-group">
+              <label>ОС (тег)</label>
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                {OS_OPTIONS.map((o) => (
+                  <label key={o.value}>
+                    <input
+                      type="radio"
+                      name="os"
+                      value={o.value}
+                      checked={form.osTag === o.value}
+                      onChange={() => setForm((f) => ({ ...f, osTag: o.value }))}
+                    /> {o.label}
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="form-group">
+              <label>Тег ИС (код, авто)</label>
               <input
-                value={customInput}
-                onChange={(e) => setCustomInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addCustomTag())}
-                placeholder="Введите тег и нажмите Добавить"
-                style={{ maxWidth: 280 }}
+                value={
+                  form.info_system
+                    ? (infoSystems.find((is) => is.id === form.info_system)?.code || '').toString().trim().toUpperCase().replace(/\s/g, '_') || '—'
+                    : '—'
+                }
+                disabled
               />
-              <button type="button" className="btn btn-secondary" onClick={addCustomTag}>Добавить</button>
             </div>
-            <div className="tags-row" style={{ marginTop: '0.5rem' }}>
-              {form.customTags.map((t) => (
-                <span key={t} className="badge">
-                  {t}
-                  <button type="button" onClick={() => removeCustomTag(t)} aria-label="Удалить">×</button>
-                </span>
-              ))}
+            <div className="form-group">
+              <label>Кастомные теги</label>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                <input
+                  value={customInput}
+                  onChange={(e) => setCustomInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addCustomTag())}
+                  placeholder="Введите тег и нажмите Добавить"
+                  style={{ maxWidth: 280 }}
+                />
+                <button type="button" className="btn btn-secondary" onClick={addCustomTag}>Добавить</button>
+              </div>
+              <div className="tags-row" style={{ marginTop: '0.5rem' }}>
+                {form.customTags.map((t) => (
+                  <span key={t} className="badge">
+                    {t}
+                    <button type="button" onClick={() => removeCustomTag(t)} aria-label="Удалить">×</button>
+                  </span>
+                ))}
+              </div>
             </div>
           </div>
 
           <h4 style={{ margin: '1.5rem 0 0.5rem 0', color: '#666' }}>Бюджетный учет</h4>
 
-          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+          <div className="form-row">
             <div className="form-group">
               <label>БА.ПФМ_зак</label>
               <input
@@ -392,18 +394,14 @@ export default function VMs() {
                 required
               />
             </div>
-          </div>
-
-          <div className="form-group">
-            <label>БА.Программа_бюджета</label>
-            <input
-              value={form.ba_programma_byudzheta}
-              onChange={(e) => setForm((f) => ({ ...f, ba_programma_byudzheta: e.target.value }))}
-              placeholder="Необязательное поле"
-            />
-          </div>
-
-          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+            <div className="form-group">
+              <label>БА.Программа_бюджета</label>
+              <input
+                value={form.ba_programma_byudzheta}
+                onChange={(e) => setForm((f) => ({ ...f, ba_programma_byudzheta: e.target.value }))}
+                placeholder="Необязательное поле"
+              />
+            </div>
             <div className="form-group">
               <label>БА.Финансовая_позиция</label>
               <input
