@@ -11,6 +11,13 @@ const INITIAL_FORM = {
   ram_quota: 0,
   disk_quota: 0,
 }
+const INITIAL_USER_FORM = {
+  username: '',
+  password: '',
+  role: 'analyst',
+  is_active: true,
+  must_change_password: false,
+}
 
 export default function Admin({ canWrite = false, userRole = '' }) {
   const [departments, setDepartments] = useState([])
@@ -22,6 +29,9 @@ export default function Admin({ canWrite = false, userRole = '' }) {
   const [error, setError] = useState('')
   const [expandedDepts, setExpandedDepts] = useState(() => new Set())
   const [expandedStreams, setExpandedStreams] = useState(() => new Set())
+  const [users, setUsers] = useState([])
+  const [userEditing, setUserEditing] = useState(null)
+  const [userForm, setUserForm] = useState({ ...INITIAL_USER_FORM })
 
   const toggleDept = (id) => setExpandedDepts((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n })
   const toggleStream = (id) => setExpandedStreams((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n })
@@ -56,6 +66,9 @@ export default function Admin({ canWrite = false, userRole = '' }) {
     api.departments.list().then((r) => setDepartments(toList(r))).catch(() => setDepartments([]))
     api.streams.list().then((r) => setStreams(toList(r))).catch(() => setStreams([]))
     api.infoSystems.list().then((r) => setInfoSystems(toList(r))).catch(() => setInfoSystems([]))
+    if (canWrite) {
+      api.auth.users.list().then((r) => setUsers(Array.isArray(r) ? r : [])).catch(() => setUsers([]))
+    }
   }
 
   useEffect(() => { load() }, [])
@@ -63,6 +76,9 @@ export default function Admin({ canWrite = false, userRole = '' }) {
   const handleSave = async (e) => {
     e.preventDefault()
     if (!canWrite) return
+    if (tab === 'users') {
+      return handleUserSave()
+    }
     setError('')
     try {
       if (tab === 'departments') {
@@ -140,6 +156,57 @@ export default function Admin({ canWrite = false, userRole = '' }) {
     else setForm({ name: item.name, short_name: '', department: '', stream: item.stream, code: item.code || '', is_id: item.is_id || '', cpu_quota: 0, ram_quota: 0, disk_quota: 0 })
   }
 
+  const startUserEdit = (user) => {
+    setTab('users')
+    setUserEditing(user)
+    setUserForm({
+      username: user.username,
+      password: '',
+      role: user.role || 'analyst',
+      is_active: user.is_active !== false,
+      must_change_password: user.must_change_password === true,
+    })
+    setError('')
+  }
+
+  const handleUserSave = async () => {
+    setError('')
+    try {
+      if (!userEditing) {
+        if (!userForm.username.trim()) {
+          setError('Логин обязателен.')
+          return
+        }
+        if (!userForm.password.trim()) {
+          setError('Пароль обязателен.')
+          return
+        }
+        await api.auth.users.create({
+          username: userForm.username.trim(),
+          password: userForm.password,
+          role: userForm.role,
+          is_active: userForm.is_active,
+          must_change_password: userForm.must_change_password,
+        })
+      } else {
+        const payload = {
+          role: userForm.role,
+          is_active: userForm.is_active,
+          must_change_password: userForm.must_change_password,
+        }
+        if (userForm.password.trim()) {
+          payload.password = userForm.password
+        }
+        await api.auth.users.update(userEditing.id, payload)
+      }
+      setUserEditing(null)
+      setUserForm({ ...INITIAL_USER_FORM })
+      load()
+    } catch (err) {
+      setError(err.body?.error || err.body?.detail || err.message || 'Ошибка при сохранении пользователя')
+    }
+  }
+
   return (
     <>
       <h1 className="page-title">Администрирование</h1>
@@ -150,169 +217,246 @@ export default function Admin({ canWrite = false, userRole = '' }) {
       )}
       <div className="card">
         <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
-          {['departments', 'streams', 'info-systems'].map((t) => (
+          {['departments', 'streams', 'info-systems', ...(canWrite ? ['users'] : [])].map((t) => (
             <button
               key={t}
               type="button"
               className={tab === t ? 'btn' : 'btn btn-secondary'}
-              onClick={() => { setTab(t); setEditing(null); setForm({ ...INITIAL_FORM }) }}
+              onClick={() => {
+                setTab(t)
+                setEditing(null)
+                setUserEditing(null)
+                setForm({ ...INITIAL_FORM })
+                setUserForm({ ...INITIAL_USER_FORM })
+                setError('')
+              }}
             >
               {t === 'departments' && 'Департаменты'}
               {t === 'streams' && 'Стримы'}
               {t === 'info-systems' && 'ИС'}
+              {t === 'users' && 'Пользователи'}
             </button>
           ))}
         </div>
 
         {canWrite && (
-        <form onSubmit={handleSave}>
-          <div className="form-group">
-            <label>Название</label>
-            <input
-              value={form.name}
-              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              required
-            />
-          </div>
-          {tab === 'departments' && (
-            <>
+          <form onSubmit={handleSave}>
+            {tab !== 'users' && (
               <div className="form-group">
-                <label>Краткое название</label>
+                <label>Название</label>
                 <input
-                  value={form.short_name}
-                  onChange={(e) => setForm((f) => ({ ...f, short_name: e.target.value }))}
+                  value={form.name}
+                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                  required
                 />
               </div>
-              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+            )}
+            {tab === 'departments' && (
+              <>
                 <div className="form-group">
-                  <label>Квота CPU</label>
+                  <label>Краткое название</label>
                   <input
-                    type="number"
-                    min={0}
-                    value={form.cpu_quota}
-                    onChange={(e) => setForm((f) => ({ ...f, cpu_quota: e.target.value }))}
+                    value={form.short_name}
+                    onChange={(e) => setForm((f) => ({ ...f, short_name: e.target.value }))}
                   />
                 </div>
-                <div className="form-group">
-                  <label>Квота RAM (ГБ)</label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={form.ram_quota}
-                    onChange={(e) => setForm((f) => ({ ...f, ram_quota: e.target.value }))}
-                  />
+                <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                  <div className="form-group">
+                    <label>Квота CPU</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={form.cpu_quota}
+                      onChange={(e) => setForm((f) => ({ ...f, cpu_quota: e.target.value }))}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Квота RAM (ГБ)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={form.ram_quota}
+                      onChange={(e) => setForm((f) => ({ ...f, ram_quota: e.target.value }))}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Квота DISK (ГБ)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={form.disk_quota}
+                      onChange={(e) => setForm((f) => ({ ...f, disk_quota: e.target.value }))}
+                    />
+                  </div>
                 </div>
-                <div className="form-group">
-                  <label>Квота DISK (ГБ)</label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={form.disk_quota}
-                    onChange={(e) => setForm((f) => ({ ...f, disk_quota: e.target.value }))}
-                  />
-                </div>
-              </div>
-              {editing && (
-                <>
-                  <p className="empty-hint" style={{ marginTop: 0 }}>
-                    Сумма квот входящих стримов: CPU {selectedDepartmentSums.cpu}, RAM {selectedDepartmentSums.ram}, DISK {selectedDepartmentSums.disk}
-                  </p>
-                  {hasDepartmentQuotaWarning && (
-                    <p className="warning-msg">
-                      Сумма квот стримов превышает введённую квоту департамента. Сохранение разрешено.
+                {editing && (
+                  <>
+                    <p className="empty-hint" style={{ marginTop: 0 }}>
+                      Сумма квот входящих стримов: CPU {selectedDepartmentSums.cpu}, RAM {selectedDepartmentSums.ram}, DISK {selectedDepartmentSums.disk}
                     </p>
-                  )}
-                </>
-              )}
-            </>
-          )}
-          {tab === 'streams' && (
-            <>
-              <div className="form-group">
-                <label>Департамент</label>
-                <select
-                  value={form.department}
-                  onChange={(e) => setForm((f) => ({ ...f, department: e.target.value }))}
-                  required
-                >
-                  <option value="">—</option>
-                  {departments.map((d) => (
-                    <option key={d.id} value={d.id}>{d.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                    {hasDepartmentQuotaWarning && (
+                      <p className="warning-msg">
+                        Сумма квот стримов превышает введённую квоту департамента. Сохранение разрешено.
+                      </p>
+                    )}
+                  </>
+                )}
+              </>
+            )}
+            {tab === 'streams' && (
+              <>
                 <div className="form-group">
-                  <label>Квота CPU</label>
+                  <label>Департамент</label>
+                  <select
+                    value={form.department}
+                    onChange={(e) => setForm((f) => ({ ...f, department: e.target.value }))}
+                    required
+                  >
+                    <option value="">—</option>
+                    {departments.map((d) => (
+                      <option key={d.id} value={d.id}>{d.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                  <div className="form-group">
+                    <label>Квота CPU</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={form.cpu_quota}
+                      onChange={(e) => setForm((f) => ({ ...f, cpu_quota: e.target.value }))}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Квота RAM (ГБ)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={form.ram_quota}
+                      onChange={(e) => setForm((f) => ({ ...f, ram_quota: e.target.value }))}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Квота DISK (ГБ)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={form.disk_quota}
+                      onChange={(e) => setForm((f) => ({ ...f, disk_quota: e.target.value }))}
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+            {tab === 'info-systems' && (
+              <>
+                <div className="form-group">
+                  <label>Код ИС</label>
                   <input
-                    type="number"
-                    min={0}
-                    value={form.cpu_quota}
-                    onChange={(e) => setForm((f) => ({ ...f, cpu_quota: e.target.value }))}
+                    value={form.code}
+                    onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
+                    placeholder="Код информационной системы"
                   />
                 </div>
                 <div className="form-group">
-                  <label>Квота RAM (ГБ)</label>
+                  <label>IS ID</label>
                   <input
-                    type="number"
-                    min={0}
-                    value={form.ram_quota}
-                    onChange={(e) => setForm((f) => ({ ...f, ram_quota: e.target.value }))}
+                    value={form.is_id}
+                    onChange={(e) => setForm((f) => ({ ...f, is_id: e.target.value }))}
+                    placeholder="Идентификатор ИС"
                   />
                 </div>
                 <div className="form-group">
-                  <label>Квота DISK (ГБ)</label>
+                  <label>Стрим</label>
+                  <select
+                    value={form.stream}
+                    onChange={(e) => setForm((f) => ({ ...f, stream: e.target.value }))}
+                    required
+                  >
+                    <option value="">—</option>
+                    {streams.map((s) => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </>
+            )}
+            {tab === 'users' && (
+              <>
+                <div className="form-group">
+                  <label>Логин</label>
                   <input
-                    type="number"
-                    min={0}
-                    value={form.disk_quota}
-                    onChange={(e) => setForm((f) => ({ ...f, disk_quota: e.target.value }))}
+                    value={userForm.username}
+                    onChange={(e) => setUserForm((f) => ({ ...f, username: e.target.value }))}
+                    disabled={Boolean(userEditing)}
+                    required
                   />
                 </div>
-              </div>
-            </>
-          )}
-          {tab === 'info-systems' && (
-            <>
-              <div className="form-group">
-                <label>Код ИС</label>
-                <input
-                  value={form.code}
-                  onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
-                  placeholder="Код информационной системы"
-                />
-              </div>
-              <div className="form-group">
-                <label>IS ID</label>
-                <input
-                  value={form.is_id}
-                  onChange={(e) => setForm((f) => ({ ...f, is_id: e.target.value }))}
-                  placeholder="Идентификатор ИС"
-                />
-              </div>
-              <div className="form-group">
-                <label>Стрим</label>
-                <select
-                  value={form.stream}
-                  onChange={(e) => setForm((f) => ({ ...f, stream: e.target.value }))}
-                  required
-                >
-                  <option value="">—</option>
-                  {streams.map((s) => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
-                  ))}
-                </select>
-              </div>
-            </>
-          )}
-          {error && <p className="error-msg">{error}</p>}
-          <button type="submit" className="btn">{editing ? 'Сохранить' : 'Создать'}</button>
-          {editing && (
-            <button type="button" className="btn btn-secondary" style={{ marginLeft: '0.5rem' }} onClick={() => setEditing(null)}>
-              Отмена
+                <div className="form-group">
+                  <label>{userEditing ? 'Новый пароль (опционально)' : 'Пароль'}</label>
+                  <input
+                    type="password"
+                    value={userForm.password}
+                    onChange={(e) => setUserForm((f) => ({ ...f, password: e.target.value }))}
+                    placeholder={userEditing ? 'Оставьте пустым, чтобы не менять' : 'Минимум 8 символов'}
+                    required={!userEditing}
+                  />
+                </div>
+                <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                  <div className="form-group">
+                    <label>Роль</label>
+                    <select
+                      value={userForm.role}
+                      onChange={(e) => setUserForm((f) => ({ ...f, role: e.target.value }))}
+                    >
+                      <option value="admin">admin</option>
+                      <option value="analyst">analyst</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Статус</label>
+                    <select
+                      value={userForm.is_active ? 'active' : 'inactive'}
+                      onChange={(e) => setUserForm((f) => ({ ...f, is_active: e.target.value === 'active' }))}
+                    >
+                      <option value="active">active</option>
+                      <option value="inactive">inactive</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Смена пароля при входе</label>
+                    <select
+                      value={userForm.must_change_password ? 'yes' : 'no'}
+                      onChange={(e) => setUserForm((f) => ({ ...f, must_change_password: e.target.value === 'yes' }))}
+                    >
+                      <option value="yes">да</option>
+                      <option value="no">нет</option>
+                    </select>
+                  </div>
+                </div>
+              </>
+            )}
+            {error && <p className="error-msg">{error}</p>}
+            <button type="submit" className="btn">
+              {tab === 'users' ? (userEditing ? 'Сохранить пользователя' : 'Создать пользователя') : (editing ? 'Сохранить' : 'Создать')}
             </button>
-          )}
-        </form>
+            {(editing || userEditing) && (
+              <button
+                type="button"
+                className="btn btn-secondary"
+                style={{ marginLeft: '0.5rem' }}
+                onClick={() => {
+                  setEditing(null)
+                  setUserEditing(null)
+                  setForm({ ...INITIAL_FORM })
+                  setUserForm({ ...INITIAL_USER_FORM })
+                }}
+              >
+                Отмена
+              </button>
+            )}
+          </form>
         )}
       </div>
 
@@ -444,6 +588,35 @@ export default function Admin({ canWrite = false, userRole = '' }) {
                     </td>
                   </tr>
                 ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {tab === 'users' && (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Логин</th><th>Роль</th><th>Статус</th><th>Смена пароля</th><th></th></tr>
+              </thead>
+              <tbody>
+                {users.map((u) => (
+                  <tr key={u.id}>
+                    <td>{u.username}</td>
+                    <td>{u.role}</td>
+                    <td>{u.is_active ? 'active' : 'inactive'}</td>
+                    <td>{u.must_change_password ? 'да' : 'нет'}</td>
+                    <td>
+                      <button className="btn btn-sm btn-secondary" onClick={() => startUserEdit(u)}>
+                        Изменить
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {users.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="empty-hint">Пользователи не найдены</td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
