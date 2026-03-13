@@ -20,14 +20,16 @@ services:
     build: ./backend-go
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-vminventory}:${POSTGRES_PASSWORD:-vminventory_secret}@db:5432/${POSTGRES_DB:-vminventory}
-      POSTGRES_DB: ${POSTGRES_DB:-vminventory}
-      POSTGRES_USER: ${POSTGRES_USER:-vminventory}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-vminventory_secret}
-      POSTGRES_HOST: db
-      POSTGRES_PORT: 5432
-      PORT: 8000
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:8000/healthz || exit 1"]
+      SECRET_KEY: ${SECRET_KEY:-dev-secret-key-change-in-production}
+      DEBUG: ${DEBUG:-false}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,backend,nginx,192.168.20.10}
+      LDAP_URI: ${LDAP_URI:-}
+      LDAP_BIND_DN: ${LDAP_BIND_DN:-}
+      LDAP_BIND_PASSWORD: ${LDAP_BIND_PASSWORD:-}
+      LDAP_USER_SEARCH_BASE: ${LDAP_USER_SEARCH_BASE:-}
+      LDAP_GROUPS_BASE: ${LDAP_GROUPS_BASE:-}
+    volumes:
+      - static_volume:/app/staticfiles
       interval: 10s
       timeout: 5s
       retries: 3
