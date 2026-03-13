@@ -12,9 +12,13 @@ def build_report_xlsx():
     wb = Workbook()
     ws = wb.active
     ws.title = "VM Inventory Report"
+    ws.page_setup.orientation = ws.ORIENTATION_LANDSCAPE
+    ws.page_setup.paperSize = ws.PAPERSIZE_A4
+    ws.page_setup.fitToWidth = 1
+    ws.page_setup.fitToHeight = 0
     
     # Заголовок
-    ws.merge_cells('A1:F1')
+    ws.merge_cells('A1:M1')
     ws['A1'] = 'VM Inventory — Report'
     ws['A1'].font = Font(bold=True, size=14)
     ws['A1'].alignment = Alignment(horizontal='center')
@@ -43,7 +47,7 @@ def build_report_xlsx():
         # Департамент
         dept_has_exceeded = False
         dept_name = dept.name
-        ws.merge_cells(f'A{row}:F{row}')
+        ws.merge_cells(f'A{row}:M{row}')
         ws[f'A{row}'] = dept_name
         ws[f'A{row}'].fill = dept_fill
         ws[f'A{row}'].font = dept_font
@@ -56,7 +60,7 @@ def build_report_xlsx():
             stream_sum_disk = 0
             
             # Стрим
-            ws.merge_cells(f'B{row}:F{row}')
+            ws.merge_cells(f'B{row}:M{row}')
             ws[f'B{row}'] = stream.name
             ws[f'B{row}'].fill = stream_fill
             ws[f'B{row}'].font = stream_font
@@ -66,7 +70,7 @@ def build_report_xlsx():
                 vms_list = list(isys.vms.all())
                 if vms_list:
                     # ИС заголовок
-                    ws.merge_cells(f'C{row}:F{row}')
+                    ws.merge_cells(f'C{row}:M{row}')
                     ws[f'C{row}'] = isys.name
                     ws[f'C{row}'].fill = is_fill
                     ws[f'C{row}'].font = Font(bold=True)
@@ -78,7 +82,12 @@ def build_report_xlsx():
                     ws[f'F{row}'] = 'CPU'
                     ws[f'G{row}'] = 'RAM (ГБ)'
                     ws[f'H{row}'] = 'Диск (ГБ)'
-                    for col in ['D', 'E', 'F', 'G', 'H']:
+                    ws[f'I{row}'] = 'БА.ПФМ_зак'
+                    ws[f'J{row}'] = 'БА.ПФМ_исп'
+                    ws[f'K{row}'] = 'БА.Программа_бюджета'
+                    ws[f'L{row}'] = 'БА.Финансовая_позиция'
+                    ws[f'M{row}'] = 'БА.Mir-код'
+                    for col in ['D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M']:
                         ws[f'{col}{row}'].fill = header_fill
                         ws[f'{col}{row}'].font = header_font
                     row += 1
@@ -93,6 +102,11 @@ def build_report_xlsx():
                         ws[f'F{row}'] = vm.cpu
                         ws[f'G{row}'] = vm.ram
                         ws[f'H{row}'] = vm.disk
+                        ws[f'I{row}'] = vm.ba_pfm_zak
+                        ws[f'J{row}'] = vm.ba_pfm_isp
+                        ws[f'K{row}'] = vm.ba_programma_byudzheta
+                        ws[f'L{row}'] = vm.ba_finansovaya_pozitsiya
+                        ws[f'M{row}'] = vm.ba_mir_kod
                         row += 1
                     
                     # Итого ИС
@@ -111,20 +125,38 @@ def build_report_xlsx():
                     stream_sum_ram += sum_ram
                     stream_sum_disk += sum_disk
                 
-                if stream_vm_count > 0:
-                    # Итого Стрим
-                    ws[f'C{row}'] = f'Итого Стрим: {stream_vm_count} ВМ'
-                    ws[f'F{row}'] = stream_sum_cpu
-                    ws[f'G{row}'] = stream_sum_ram
-                    ws[f'H{row}'] = stream_sum_disk
-                    ws[f'C{row}'].font = Font(bold=True)
-                    ws[f'C{row}'].fill = stream_fill
-                    row += 1
-                    
-                    dept_vm_count += stream_vm_count
-                    dept_sum_cpu += stream_sum_cpu
-                    dept_sum_ram += stream_sum_ram
-                    dept_sum_disk += stream_sum_disk
+            if stream_vm_count > 0:
+                # Итого Стрим (одна строка на стрим, после всех ИС)
+                stream_has_exceeded = (
+                    (stream.cpu_quota > 0 and stream_sum_cpu > stream.cpu_quota)
+                    or (stream.ram_quota > 0 and stream_sum_ram > stream.ram_quota)
+                    or (stream.disk_quota > 0 and stream_sum_disk > stream.disk_quota)
+                )
+                stream_tot = f'Итого Стрим: {stream_vm_count} ВМ'
+                if stream.cpu_quota > 0:
+                    stream_tot += f', CPU: {stream_sum_cpu}/{stream.cpu_quota}'
+                else:
+                    stream_tot += f', CPU: {stream_sum_cpu}'
+                if stream.ram_quota > 0:
+                    stream_tot += f', RAM: {stream_sum_ram}/{stream.ram_quota} ГБ'
+                else:
+                    stream_tot += f', RAM: {stream_sum_ram} ГБ'
+                if stream.disk_quota > 0:
+                    stream_tot += f', Диск: {stream_sum_disk}/{stream.disk_quota} ГБ'
+                else:
+                    stream_tot += f', Диск: {stream_sum_disk} ГБ'
+                ws[f'C{row}'] = f'{"🚨 " if stream_has_exceeded else ""}{stream_tot}'
+                ws[f'F{row}'] = stream_sum_cpu
+                ws[f'G{row}'] = stream_sum_ram
+                ws[f'H{row}'] = stream_sum_disk
+                ws[f'C{row}'].font = Font(bold=True)
+                ws[f'C{row}'].fill = stream_fill
+                row += 1
+                
+                dept_vm_count += stream_vm_count
+                dept_sum_cpu += stream_sum_cpu
+                dept_sum_ram += stream_sum_ram
+                dept_sum_disk += stream_sum_disk
         
         if dept_vm_count > 0:
             # Проверка превышения квот
@@ -161,7 +193,7 @@ def build_report_xlsx():
     # ВМ без ИС
     if orphan.exists():
         orphan_list = list(orphan)
-        ws.merge_cells(f'A{row}:F{row}')
+        ws.merge_cells(f'A{row}:M{row}')
         ws[f'A{row}'] = '(ВМ без ИС / удалённая ИС)'
         ws[f'A{row}'].fill = dept_fill
         ws[f'A{row}'].font = dept_font
@@ -172,7 +204,12 @@ def build_report_xlsx():
         ws[f'F{row}'] = 'CPU'
         ws[f'G{row}'] = 'RAM (ГБ)'
         ws[f'H{row}'] = 'Диск (ГБ)'
-        for col in ['D', 'E', 'F', 'G', 'H']:
+        ws[f'I{row}'] = 'БА.ПФМ_зак'
+        ws[f'J{row}'] = 'БА.ПФМ_исп'
+        ws[f'K{row}'] = 'БА.Программа_бюджета'
+        ws[f'L{row}'] = 'БА.Финансовая_позиция'
+        ws[f'M{row}'] = 'БА.Mir-код'
+        for col in ['D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M']:
             ws[f'{col}{row}'].fill = header_fill
             ws[f'{col}{row}'].font = header_font
         row += 1
@@ -183,6 +220,11 @@ def build_report_xlsx():
             ws[f'F{row}'] = vm.cpu
             ws[f'G{row}'] = vm.ram
             ws[f'H{row}'] = vm.disk
+            ws[f'I{row}'] = vm.ba_pfm_zak
+            ws[f'J{row}'] = vm.ba_pfm_isp
+            ws[f'K{row}'] = vm.ba_programma_byudzheta
+            ws[f'L{row}'] = vm.ba_finansovaya_pozitsiya
+            ws[f'M{row}'] = vm.ba_mir_kod
             row += 1
         
         sum_cpu = sum(vm.cpu for vm in orphan_list)

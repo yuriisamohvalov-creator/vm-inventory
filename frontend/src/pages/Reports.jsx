@@ -81,10 +81,14 @@ export default function Reports() {
               {(dept.streams || []).map((stream) => (
                 <div key={stream.id ?? 's'}>
                   <div className="stream">
+                    {stream.has_exceeded && '🚨 '}
                     {stream.name}
                     {(stream.vm_count !== undefined) && (
                       <span className="vm-count report-sums">
-                        ({stream.vm_count} ВМ, CPU: {stream.sum_cpu ?? 0}, RAM: {stream.sum_ram ?? 0} ГБ, Диск: {stream.sum_disk ?? 0} ГБ)
+                        ({stream.vm_count} ВМ, CPU: {stream.sum_cpu ?? 0}
+                        {stream.cpu_quota > 0 ? `/${stream.cpu_quota}` : ''}, RAM: {stream.sum_ram ?? 0}
+                        {stream.ram_quota > 0 ? `/${stream.ram_quota}` : ''} ГБ, Диск: {stream.sum_disk ?? 0}
+                        {stream.disk_quota > 0 ? `/${stream.disk_quota}` : ''} ГБ)
                       </span>
                     )}
                   </div>
@@ -105,6 +109,11 @@ export default function Reports() {
                           )}
                           {typeof vm === 'object' && vm.cpu !== undefined && (
                             <span className="vm-details"> (CPU: {vm.cpu}, RAM: {vm.ram} ГБ, Диск: {vm.disk} ГБ)</span>
+                          )}
+                          {typeof vm === 'object' && (
+                            <span className="vm-details">
+                              {' '}[БА.ПФМ_зак: {vm.ba_pfm_zak || '—'}, БА.ПФМ_исп: {vm.ba_pfm_isp || '—'}, БА.Программа_бюджета: {vm.ba_programma_byudzheta || '—'}, БА.Финансовая_позиция: {vm.ba_finansovaya_pozitsiya || '—'}, БА.Mir-код: {vm.ba_mir_kod || '—'}]
+                            </span>
                           )}
                         </div>
                       ))}

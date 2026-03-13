@@ -1,6 +1,6 @@
 from io import BytesIO
 
-from reportlab.lib.pagesizes import A4
+from reportlab.lib.pagesizes import A4, landscape
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import cm
 from reportlab.pdfbase import pdfmetrics
@@ -60,11 +60,37 @@ def _get_font(font_name='Helvetica'):
     return font_name
 
 
+def _draw_vm_budget_block(c, x, y, vm, font_normal, page_height):
+    """Рисует компактный бюджетный блок в 2 строки и возвращает новый y."""
+    if y < 2.2 * cm:
+        c.showPage()
+        y = page_height - 2 * cm
+    c.setFont(font_normal, 8)
+    line1 = "    БА.ПФМ_зак: %s, БА.ПФМ_исп: %s, БА.Программа_бюджета: %s" % (
+        vm.ba_pfm_zak or "-",
+        vm.ba_pfm_isp or "-",
+        vm.ba_programma_byudzheta or "-",
+    )
+    line2 = "    БА.Финансовая_позиция: %s, БА.Mir-код: %s" % (
+        vm.ba_finansovaya_pozitsiya or "-",
+        vm.ba_mir_kod or "-",
+    )
+    c.drawString(x, y, line1)
+    y -= 0.35 * cm
+    if y < 2 * cm:
+        c.showPage()
+        y = page_height - 2 * cm
+        c.setFont(font_normal, 8)
+    c.drawString(x, y, line2)
+    y -= 0.4 * cm
+    return y
+
+
 def build_report_pdf():
     """Build hierarchical report PDF (Department -> Stream -> IS -> VMs)."""
     buf = BytesIO()
-    c = canvas.Canvas(buf, pagesize=A4)
-    width, height = A4
+    c = canvas.Canvas(buf, pagesize=landscape(A4))
+    width, height = landscape(A4)
     y = height - 2 * cm
     
     font_normal = _get_font('Helvetica')
@@ -117,6 +143,7 @@ def build_report_pdf():
                     vm_text += " (CPU: %d, RAM: %d ГБ, Диск: %d ГБ)" % (vm.cpu, vm.ram, vm.disk)
                     c.drawString(5 * cm, y, vm_text)
                     y -= 0.4 * cm
+                    y = _draw_vm_budget_block(c, 5 * cm, y, vm, font_normal, height)
                 if vms_list:
                     sum_cpu = sum(vm.cpu for vm in vms_list)
                     sum_ram = sum(vm.ram for vm in vms_list)
@@ -134,12 +161,32 @@ def build_report_pdf():
                     stream_sum_disk += sum_disk
                 y -= 0.2 * cm
             if stream_vm_count > 0:
-                stream_tot = "  Итого Стрим: %d ВМ, CPU: %d, RAM: %d ГБ, Диск: %d ГБ" % (stream_vm_count, stream_sum_cpu, stream_sum_ram, stream_sum_disk)
+                stream_has_exceeded = (
+                    (stream.cpu_quota > 0 and stream_sum_cpu > stream.cpu_quota)
+                    or (stream.ram_quota > 0 and stream_sum_ram > stream.ram_quota)
+                    or (stream.disk_quota > 0 and stream_sum_disk > stream.disk_quota)
+                )
+                stream_tot = "  Итого Стрим: %d ВМ" % stream_vm_count
+                if stream.cpu_quota > 0:
+                    stream_tot += ", CPU: %d/%d" % (stream_sum_cpu, stream.cpu_quota)
+                else:
+                    stream_tot += ", CPU: %d" % stream_sum_cpu
+                if stream.ram_quota > 0:
+                    stream_tot += ", RAM: %d/%d ГБ" % (stream_sum_ram, stream.ram_quota)
+                else:
+                    stream_tot += ", RAM: %d ГБ" % stream_sum_ram
+                if stream.disk_quota > 0:
+                    stream_tot += ", Диск: %d/%d ГБ" % (stream_sum_disk, stream.disk_quota)
+                else:
+                    stream_tot += ", Диск: %d ГБ" % stream_sum_disk
                 if y < 2 * cm:
                     c.showPage()
                     y = height - 2 * cm
                 c.setFont(font_bold, 10)
-                c.drawString(3 * cm, y, stream_tot)
+                if stream_has_exceeded:
+                    c.drawString(3 * cm, y, "🚨 " + stream_tot)
+                else:
+                    c.drawString(3 * cm, y, stream_tot)
                 y -= 0.6 * cm
                 dept_vm_count += stream_vm_count
                 dept_sum_cpu += stream_sum_cpu
@@ -197,6 +244,7 @@ def build_report_pdf():
             vm_text += " (CPU: %d, RAM: %d ГБ, Диск: %d ГБ)" % (vm.cpu, vm.ram, vm.disk)
             c.drawString(3 * cm, y, vm_text)
             y -= 0.4 * cm
+            y = _draw_vm_budget_block(c, 3 * cm, y, vm, font_normal, height)
         sum_cpu = sum(vm.cpu for vm in orphan_list)
         sum_ram = sum(vm.ram for vm in orphan_list)
         sum_disk = sum(vm.disk for vm in orphan_list)

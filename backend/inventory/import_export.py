@@ -496,7 +496,14 @@ def report_json_response():
             stream_sum_cpu = 0
             stream_sum_ram = 0
             stream_sum_disk = 0
-            stream_data = {'id': stream.id, 'name': stream.name, 'info_systems': []}
+            stream_data = {
+                'id': stream.id,
+                'name': stream.name,
+                'cpu_quota': stream.cpu_quota,
+                'ram_quota': stream.ram_quota,
+                'disk_quota': stream.disk_quota,
+                'info_systems': [],
+            }
             for isys in stream.info_systems.all():
                 vms_qs = isys.vms.all()
                 vms_list = []
@@ -507,6 +514,11 @@ def report_json_response():
                         'cpu': vm.cpu,
                         'ram': vm.ram,
                         'disk': vm.disk,
+                        'ba_pfm_zak': vm.ba_pfm_zak,
+                        'ba_pfm_isp': vm.ba_pfm_isp,
+                        'ba_programma_byudzheta': vm.ba_programma_byudzheta,
+                        'ba_finansovaya_pozitsiya': vm.ba_finansovaya_pozitsiya,
+                        'ba_mir_kod': vm.ba_mir_kod,
                         'info_system_deleted': vm.info_system is None,
                     })
                 aggr = vms_qs.aggregate(sum_cpu=Sum('cpu'), sum_ram=Sum('ram'), sum_disk=Sum('disk'))
@@ -533,6 +545,11 @@ def report_json_response():
             stream_data['sum_cpu'] = stream_sum_cpu
             stream_data['sum_ram'] = stream_sum_ram
             stream_data['sum_disk'] = stream_sum_disk
+            stream_data['has_exceeded'] = (
+                (stream.cpu_quota > 0 and stream_sum_cpu > stream.cpu_quota)
+                or (stream.ram_quota > 0 and stream_sum_ram > stream.ram_quota)
+                or (stream.disk_quota > 0 and stream_sum_disk > stream.disk_quota)
+            )
             dept_data['streams'].append(stream_data)
             dept_vm_count += stream_vm_count
             dept_sum_cpu += stream_sum_cpu
@@ -561,6 +578,11 @@ def report_json_response():
                 'cpu': vm.cpu,
                 'ram': vm.ram,
                 'disk': vm.disk,
+                'ba_pfm_zak': vm.ba_pfm_zak,
+                'ba_pfm_isp': vm.ba_pfm_isp,
+                'ba_programma_byudzheta': vm.ba_programma_byudzheta,
+                'ba_finansovaya_pozitsiya': vm.ba_finansovaya_pozitsiya,
+                'ba_mir_kod': vm.ba_mir_kod,
                 'info_system_deleted': True,  # ВМ без ИС считаются как с удаленной ИС
             })
         aggr = orphan_vms.aggregate(sum_cpu=Sum('cpu'), sum_ram=Sum('ram'), sum_disk=Sum('disk'))
@@ -575,6 +597,10 @@ def report_json_response():
             'streams': [{
                 'id': None,
                 'name': '—',
+                'cpu_quota': 0,
+                'ram_quota': 0,
+                'disk_quota': 0,
+                'has_exceeded': False,
                 'vm_count': len(orphan_list),
                 'sum_cpu': aggr['sum_cpu'] or 0,
                 'sum_ram': aggr['sum_ram'] or 0,

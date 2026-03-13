@@ -54,6 +54,8 @@ input, select, textarea {
   background: var(--bg-sidebar);
   padding: 1rem 0;
   border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
 }
 
 .sidebar h1 {
@@ -75,6 +77,38 @@ input, select, textarea {
   color: var(--accent-green);
   background: rgba(45, 106, 79, 0.15);
   border-left-color: var(--accent-green);
+}
+
+.sidebar-user {
+  margin-top: auto;
+  padding: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.sidebar-user-name {
+  font-size: 0.9rem;
+}
+
+.sidebar-user-role {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  margin-bottom: 0.6rem;
+}
+
+.auth-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 380px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1.25rem;
 }
 
 .main {

@@ -24,7 +24,7 @@ const defaultForm = {
   ba_mir_kod: 'ITI_000_0000',
 }
 
-export default function VMs() {
+export default function VMs({ canWrite = false }) {
   const [vms, setVms] = useState([])
   const [departments, setDepartments] = useState([])
   const [streams, setStreams] = useState([])
@@ -34,6 +34,7 @@ export default function VMs() {
   const [form, setForm] = useState(defaultForm)
   const [customInput, setCustomInput] = useState('')
   const [error, setError] = useState('')
+  const [deleteError, setDeleteError] = useState('')
   const [ipWarning, setIpWarning] = useState('')
 
   const load = () => {
@@ -252,7 +253,7 @@ export default function VMs() {
     <>
       <h1 className="page-title">Виртуальные машины</h1>
 
-      {!showForm && (
+      {!showForm && canWrite && (
         <div className="card">
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
             <button type="button" className="btn" onClick={() => { setEditing(null); setForm(defaultForm); setCustomInput(''); setShowForm(true); }}>
@@ -262,7 +263,7 @@ export default function VMs() {
         </div>
       )}
 
-      {showForm && (
+      {showForm && canWrite && (
       <div className="card">
         <h3 style={{ marginTop: 0 }}>{editing ? 'Редактировать ВМ' : 'Добавить ВМ'}</h3>
         <form onSubmit={handleSave}>
@@ -432,6 +433,7 @@ export default function VMs() {
       )}
 
       <div className="card">
+        {deleteError && <p className="error-msg">{deleteError}</p>}
         <div className="table-wrap">
           <table className="vm-grouped-table">
             <thead>
@@ -488,20 +490,30 @@ export default function VMs() {
                               <td>{vm.ba_mir_kod || '—'}</td>
                               <td>{vm.ba_programma_byudzheta || '—'}</td>
                               <td>
-                                <button className="btn btn-sm btn-secondary" onClick={() => startEdit(vm)}>Редактировать</button>
-                                <button
-                                  className="btn btn-sm btn-danger"
-                                  style={{ marginLeft: '0.5rem' }}
-                                  onClick={async () => {
-                                    if (!confirm('Удалить ВМ?')) return
-                                    try {
-                                      await api.vms.delete(vm.id)
-                                      load()
-                                    } catch (_) {}
-                                  }}
-                                >
-                                  Удалить
-                                </button>
+                                {canWrite ? (
+                                  <>
+                                    <button className="btn btn-sm btn-secondary" onClick={() => startEdit(vm)}>Редактировать</button>
+                                    <button
+                                      className="btn btn-sm btn-danger"
+                                      style={{ marginLeft: '0.5rem' }}
+                                      onClick={async () => {
+                                        if (!confirm('Удалить ВМ?')) return
+                                        setDeleteError('')
+                                        try {
+                                          await api.vms.delete(vm.id)
+                                          load()
+                                        } catch (err) {
+                                          const msg = err.body?.detail || err.body?.error || err.message || 'Не удалось удалить ВМ'
+                                          setDeleteError(msg)
+                                        }
+                                      }}
+                                    >
+                                      Удалить
+                                    </button>
+                                  </>
+                                ) : (
+                                  <span className="empty-hint" style={{ padding: 0 }}>Только чтение</span>
+                                )}
                               </td>
                             </tr>
                           ))}
