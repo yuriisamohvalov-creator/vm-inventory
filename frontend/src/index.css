@@ -54,6 +54,8 @@ input, select, textarea {
   background: var(--bg-sidebar);
   padding: 1rem 0;
   border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
 }
 
 .sidebar h1 {

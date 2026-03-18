@@ -24,7 +24,7 @@ const defaultForm = {
   ba_mir_kod: 'ITI_000_0000',
 }
 
-export default function VMs() {
+export default function VMs({ canWrite = false }) {
   const [vms, setVms] = useState([])
   const [departments, setDepartments] = useState([])
   const [streams, setStreams] = useState([])
@@ -253,7 +253,7 @@ export default function VMs() {
     <>
       <h1 className="page-title">Виртуальные машины</h1>
 
-      {!showForm && (
+      {!showForm && canWrite && (
         <div className="card">
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
             <button type="button" className="btn" onClick={() => { setEditing(null); setForm(defaultForm); setCustomInput(''); setShowForm(true); }}>
@@ -263,7 +263,7 @@ export default function VMs() {
         </div>
       )}
 
-      {showForm && (
+      {showForm && canWrite && (
       <div className="card">
         <h3 style={{ marginTop: 0 }}>{editing ? 'Редактировать ВМ' : 'Добавить ВМ'}</h3>
         <form onSubmit={handleSave}>

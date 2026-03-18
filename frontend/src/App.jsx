@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom'
+import { api } from './api'
 import Admin from './pages/Admin'
 import VMs from './pages/VMs'
 import Pools from './pages/Pools'
@@ -53,10 +54,10 @@ function App() {
         </aside>
         <main className="main">
           <Routes>
-            <Route path="/" element={<VMs />} />
-            <Route path="/pools" element={<Pools />} />
+            <Route path="/" element={<VMs canWrite={canWrite} />} />
+            <Route path="/pools" element={<Pools canWrite={canWrite} />} />
             <Route path="/reports" element={<Reports />} />
-            <Route path="/admin" element={<Admin />} />
+            <Route path="/admin" element={<Admin canWrite={canWrite} userRole={user.role} />} />
           </Routes>
         </main>
       </div>

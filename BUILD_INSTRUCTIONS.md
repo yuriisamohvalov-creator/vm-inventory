@@ -2,10 +2,11 @@
 
 ## New Build Process with Custom Tags
 
-The project now uses a custom tagging system for Docker images in the format: `YYYYMMDD-vXXX`
+The project uses a custom tagging system for Docker images in the format: `<git-branch>-DDMMYYYY-HHMM`
 
-- `YYYYMMDD` - current date (e.g., 20260218 for February 18, 2026)
-- `vXXX` - 3-digit version number starting from 000 (e.g., v001, v002, etc.)
+- `<git-branch>` - current git branch name (for example, `go-version-develop`)
+- `DDMMYYYY` - current date (for example, `12032026`)
+- `HHMM` - current time in 24-hour format (for example, `1542`)
 
 ## How to Build Images
 
@@ -16,11 +17,10 @@ The project now uses a custom tagging system for Docker images in the format: `Y
 ```
 
 This script will:
-1. Get the current date
-2. Find the highest existing tag number for today
-3. Increment it by 1
-4. Build all images with the new tag
-5. Tag the images appropriately
+1. Get the current git branch name
+2. Build the timestamp in `DDMMYYYY-HHMM` format
+3. Build all images
+4. Tag the images with the generated tag
 
 ### Manual Build Process
 
@@ -30,17 +30,16 @@ If you prefer to build manually:
 # Build images
 docker-compose build --no-cache
 
-# Tag images manually (example for 2026-02-18, version 1)
-docker tag vm-inventory_backend backend:20260218-v001
-docker tag vm-inventory_frontend frontend:20260218-v001
-docker tag vm-inventory_nginx nginx:20260218-v001
+# Tag images manually (example)
+docker tag vm-inventory_backend backend:go-version-develop-12032026-1542
+docker tag vm-inventory_frontend frontend:go-version-develop-12032026-1542
+docker tag vm-inventory_nginx nginx:go-version-develop-12032026-1542
 ```
 
-## Example Tag Sequence
+## Example Tags
 
-- First build on Feb 18, 2026: `20260218-v001`
-- Second build on Feb 18, 2026: `20260218-v002`
-- First build on Feb 19, 2026: `20260219-v001`
+- Build on branch `go-version-develop`: `go-version-develop-12032026-1542`
+- Build on branch `feature/api`: `feature-api-12032026-1542` (slash is replaced with `-`)
 
 ## Running with Custom Tags
 
@@ -58,6 +57,5 @@ docker push nginx:$FINAL_TAG
 
 ## Notes
 
-- The script automatically finds the highest existing tag number for the current date
-- Version numbers reset to 001 each day
-- Tags are always 3 digits with leading zeros (001, 002, ..., 999)
+- Branch names are normalized for Docker tag compatibility (for example, `/` is replaced with `-`)
+- Tag contains date and time, so each build gets a unique tag
