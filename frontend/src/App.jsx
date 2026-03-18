@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom'
-import { api } from './api'
 import Admin from './pages/Admin'
 import VMs from './pages/VMs'
 import Pools from './pages/Pools'
@@ -26,6 +25,7 @@ function App() {
 
   if (loadingUser) return <p className="empty-hint">Проверка сессии...</p>
   if (!user) return <Login onLogin={setUser} />
+  const canWrite = user.is_superuser || (user.roles || []).includes('administrator')
 
   const handleLogout = async () => {
     await api.auth.logout()
@@ -57,7 +57,7 @@ function App() {
             <Route path="/" element={<VMs canWrite={canWrite} />} />
             <Route path="/pools" element={<Pools canWrite={canWrite} />} />
             <Route path="/reports" element={<Reports />} />
-            <Route path="/admin" element={<Admin canWrite={canWrite} userRole={user.role} />} />
+            <Route path="/admin" element={<Admin canWrite={canWrite} userRole={(user.roles || [])[0] || ''} />} />
           </Routes>
         </main>
       </div>
