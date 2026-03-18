@@ -30,6 +30,8 @@ services:
       LDAP_GROUPS_BASE: ${LDAP_GROUPS_BASE:-}
     volumes:
       - static_volume:/app/staticfiles
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:8000/healthz || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 3
