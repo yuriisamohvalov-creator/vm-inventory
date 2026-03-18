@@ -2,6 +2,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from . import views
 from . import import_export
+from . import auth_views
 
 router = DefaultRouter()
 router.register('departments', views.DepartmentViewSet, basename='department')
@@ -12,6 +13,9 @@ router.register('pools', views.PoolViewSet, basename='pool')
 router.register('report', views.ReportViewSet, basename='report')
 
 urlpatterns = [
+    path('auth/login/', auth_views.LoginView.as_view(), name='auth-login'),
+    path('auth/logout/', auth_views.LogoutView.as_view(), name='auth-logout'),
+    path('auth/me/', auth_views.MeView.as_view(), name='auth-me'),
     # Выгрузка отчёта только в PDF (отдельный view, чтобы не конфликтовать с роутером)
     path('report/export/', views.ReportExportPDFView.as_view(), name='report-export'),
     path('', include(router.urls)),

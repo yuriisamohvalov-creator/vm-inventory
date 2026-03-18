@@ -33,3 +33,7 @@ class LDAPAuthProvider(BaseAuthProvider):
             return User.objects.get(pk=user_id)
         except User.DoesNotExist:
             return None
+
+    def get_user_groups(self, username=None, user=None):
+        # TODO: implement LDAP group lookup.
+        return []

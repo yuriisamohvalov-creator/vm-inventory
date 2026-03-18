@@ -32,10 +32,11 @@ services:
       LDAP_BIND_PASSWORD: ${LDAP_BIND_PASSWORD:-}
       LDAP_USER_SEARCH_BASE: ${LDAP_USER_SEARCH_BASE:-}
       LDAP_GROUPS_BASE: ${LDAP_GROUPS_BASE:-}
+      LDAP_ROLE_GROUP_MAP: ${LDAP_ROLE_GROUP_MAP:-}
     volumes:
       - static_volume:/app/staticfiles
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/')\""]
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/admin/login/')\""]
       interval: 10s
       timeout: 5s
       retries: 3

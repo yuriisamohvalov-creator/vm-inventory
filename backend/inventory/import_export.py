@@ -7,7 +7,7 @@ from rest_framework import status
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.permissions import AllowAny
+from .permissions import RoleBasedAccessPermission
 
 from .models import Department, Stream, InfoSystem, VM, Pool, PoolVM
 from .serializers import (
@@ -157,7 +157,7 @@ def _vm_tags_from_item(item, info_system):
 
 class ImportDepartmentsView(APIView):
     """Импорт департаментов из JSON. Поддерживается вложенное дерево streams -> info_systems."""
-    permission_classes = [AllowAny]
+    permission_classes = [RoleBasedAccessPermission]
 
     def post(self, request):
         data = request.data
@@ -201,7 +201,7 @@ class ImportDepartmentsView(APIView):
 
 class ImportStreamsView(APIView):
     """Импорт стримов из JSON. Можно передать department_id или вложенный department; вложенные info_systems создаются при отсутствии."""
-    permission_classes = [AllowAny]
+    permission_classes = [RoleBasedAccessPermission]
 
     def post(self, request):
         data = request.data
@@ -248,7 +248,7 @@ class ImportStreamsView(APIView):
 
 class ImportInfoSystemsView(APIView):
     """Импорт ИС из JSON. Можно передать stream_id или вложенный stream/department; при отсутствии создаются."""
-    permission_classes = [AllowAny]
+    permission_classes = [RoleBasedAccessPermission]
 
     def post(self, request):
         data = request.data
@@ -304,7 +304,7 @@ class ImportInfoSystemsView(APIView):
 
 class ImportVMsView(APIView):
     """Импорт ВМ из JSON. Можно передать info_system_id или вложенную иерархию info_system/stream/department; при отсутствии создаются."""
-    permission_classes = [AllowAny]
+    permission_classes = [RoleBasedAccessPermission]
 
     def post(self, request):
         data = request.data
@@ -347,7 +347,7 @@ class ImportVMsView(APIView):
 
 class ImportPoolsView(APIView):
     """Импорт пулов из JSON. Передаётся массив объектов с name и опционально vm_fqdns (список FQDN ВМ для добавления в пул)."""
-    permission_classes = [AllowAny]
+    permission_classes = [RoleBasedAccessPermission]
 
     def post(self, request):
         from django.utils import timezone
@@ -397,7 +397,7 @@ class ImportPoolsView(APIView):
 
 
 @api_view(['GET'])
-@permission_classes([AllowAny])
+@permission_classes([RoleBasedAccessPermission])
 def search(request):
     """Поиск по всем разделам или конкретному разделу: департаменты, стримы, ИС, ВМ, пулы.
     
