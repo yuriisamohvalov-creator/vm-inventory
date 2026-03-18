@@ -25,6 +25,7 @@ urlpatterns = [
     path('v1/infosystems/import', import_export.ImportInfoSystemsView.as_view(), name='import-info-systems'),
     path('v1/vm/import', import_export.ImportVMsView.as_view(), name='import-vms'),
     path('v1/pools/import', import_export.ImportPoolsView.as_view(), name='import-pools'),
+    path('v1/import/bulk', import_export.ImportBulkFromFileView.as_view(), name='import-bulk'),
     # Поиск с поддержкой section
     path('v1/search', import_export.search, name='search'),
     # Отчет в JSON

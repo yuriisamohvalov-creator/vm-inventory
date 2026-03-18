@@ -125,6 +125,14 @@ export const api = {
     addVm: (poolId, vmId) => request(`/pools/${poolId}/add-vm/${vmId}/`, { method: 'POST' }),
     removeVm: (poolId, vmId) => request(`/pools/${poolId}/remove-vm/${vmId}/`, { method: 'POST' }),
   },
+  import: {
+    /** Массовый импорт из единого JSON-файла (multipart/form-data, поле "file"). */
+    bulkFromFile: async (file) => {
+      const fd = new FormData()
+      fd.append('file', file)
+      return request('/v1/import/bulk', { method: 'POST', body: fd })
+    },
+  },
   report: {
     list: () => request('/report/'),
     /** Скачивание отчёта в PDF (возвращает Blob). */
