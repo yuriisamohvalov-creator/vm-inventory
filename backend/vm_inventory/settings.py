@@ -1,4 +1,5 @@
 import os
+import json
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -16,6 +17,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
+    'rest_framework.authtoken',
     'corsheaders',
     'drf_yasg',
     'inventory',
@@ -100,7 +102,11 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # REST Framework
 REST_FRAMEWORK = {
-    'DEFAULT_PERMISSION_CLASSES': ['rest_framework.permissions.AllowAny'],
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.TokenAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': ['inventory.permissions.RoleBasedAccessPermission'],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 100,
 }
@@ -116,3 +122,12 @@ AUTH_PROVIDER = __import__('vm_inventory.auth_providers', fromlist=['get_auth_pr
     user_search_base=os.environ.get('LDAP_USER_SEARCH_BASE', ''),
     groups_base=os.environ.get('LDAP_GROUPS_BASE', ''),
 )
+
+# Optional mapping for future LDAP role sync.
+# JSON example:
+# {"administrator": ["cn=vm-admins,ou=groups,dc=example,dc=com"], "analyst": ["cn=vm-analysts,ou=groups,dc=example,dc=com"]}
+_ldap_role_group_map_raw = os.environ.get('LDAP_ROLE_GROUP_MAP', '').strip()
+try:
+    LDAP_ROLE_GROUP_MAP = json.loads(_ldap_role_group_map_raw) if _ldap_role_group_map_raw else {}
+except json.JSONDecodeError:
+    LDAP_ROLE_GROUP_MAP = {}

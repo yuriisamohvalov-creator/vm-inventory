@@ -18,6 +18,10 @@ class BaseAuthProvider(ABC):
         """Return user by id if exists."""
         pass
 
+    def get_user_groups(self, username=None, user=None):
+        """Optional: return list of external group identifiers for role mapping."""
+        return []
+
 
 class NoAuthProvider(BaseAuthProvider):
     """No authentication: all requests are treated as anonymous allowed."""

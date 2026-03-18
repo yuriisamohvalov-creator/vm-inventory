@@ -490,30 +490,24 @@ export default function VMs({ canWrite = false }) {
                               <td>{vm.ba_mir_kod || '—'}</td>
                               <td>{vm.ba_programma_byudzheta || '—'}</td>
                               <td>
-                                {canWrite ? (
-                                  <>
-                                    <button className="btn btn-sm btn-secondary" onClick={() => startEdit(vm)}>Редактировать</button>
-                                    <button
-                                      className="btn btn-sm btn-danger"
-                                      style={{ marginLeft: '0.5rem' }}
-                                      onClick={async () => {
-                                        if (!confirm('Удалить ВМ?')) return
-                                        setDeleteError('')
-                                        try {
-                                          await api.vms.delete(vm.id)
-                                          load()
-                                        } catch (err) {
-                                          const msg = err.body?.detail || err.body?.error || err.message || 'Не удалось удалить ВМ'
-                                          setDeleteError(msg)
-                                        }
-                                      }}
-                                    >
-                                      Удалить
-                                    </button>
-                                  </>
-                                ) : (
-                                  <span className="empty-hint" style={{ padding: 0 }}>Только чтение</span>
-                                )}
+                                <button className="btn btn-sm btn-secondary" onClick={() => startEdit(vm)}>Редактировать</button>
+                                <button
+                                  className="btn btn-sm btn-danger"
+                                  style={{ marginLeft: '0.5rem' }}
+                                  onClick={async () => {
+                                    if (!confirm('Удалить ВМ?')) return
+                                    setDeleteError('')
+                                    try {
+                                      await api.vms.delete(vm.id)
+                                      load()
+                                    } catch (err) {
+                                      const msg = err.body?.detail || err.body?.error || err.message || 'Не удалось удалить ВМ'
+                                      setDeleteError(msg)
+                                    }
+                                  }}
+                                >
+                                  Удалить
+                                </button>
                               </td>
                             </tr>
                           ))}

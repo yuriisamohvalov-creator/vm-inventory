@@ -15,6 +15,7 @@ from .report_xlsx import build_report_xlsx
 
 class ReportExportPDFView(APIView):
     """Выгрузка отчёта только в PDF. Отдельный view для надёжного маршрута /api/report/export/."""
+    requires_report_export_permission = True
 
     def get(self, request):
         buf = build_report_pdf()
@@ -400,6 +401,15 @@ class PoolViewSet(viewsets.ModelViewSet):
 
 
 class ReportViewSet(viewsets.ViewSet):
+    requires_report_export_permission = False
+
+    def get_permissions(self):
+        if getattr(self, 'action', None) in ('pdf', 'export_json', 'export_xlsx'):
+            self.requires_report_export_permission = True
+        else:
+            self.requires_report_export_permission = False
+        return super().get_permissions()
+
     def list(self, request):
         """Hierarchical report: Department -> Stream -> InfoSystem -> VMs with sums."""
         from django.db.models import Sum

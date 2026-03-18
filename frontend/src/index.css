@@ -80,35 +80,21 @@ input, select, textarea {
 }
 
 .sidebar-user {
-  margin-top: auto;
-  padding: 1rem;
+  margin: 1rem;
+  margin-top: 2rem;
+  padding-top: 1rem;
   border-top: 1px solid var(--border);
 }
 
 .sidebar-user-name {
   font-size: 0.9rem;
+  font-weight: 600;
 }
 
 .sidebar-user-role {
+  margin: 0.3rem 0 0.8rem;
   color: var(--text-muted);
   font-size: 0.8rem;
-  margin-bottom: 0.6rem;
-}
-
-.auth-screen {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.auth-card {
-  width: 100%;
-  max-width: 380px;
-  background: var(--card-bg);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 1.25rem;
 }
 
 .main {
@@ -513,4 +499,24 @@ tr:hover td {
   flex-wrap: wrap;
   gap: 0.25rem;
   margin: -0.25rem 0;
+}
+
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.login-card {
+  width: min(440px, 100%);
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1.5rem;
+}
+
+.login-card h1 {
+  margin: 0 0 1rem;
 }

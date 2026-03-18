@@ -91,6 +91,9 @@ vm-inventory/
 
 REST API доступен по адресу `/api/`:
 
+- `POST /api/auth/login/` — получить token по `username/password`
+- `GET /api/auth/me/` — данные текущего пользователя и роли
+- `POST /api/auth/logout/` — инвалидировать token
 - `GET /api/departments/` — список департаментов
 - `GET /api/streams/` — список стримов
 - `GET /api/info-systems/` — список ИС
@@ -114,6 +117,18 @@ pip install -r requirements.txt
 python manage.py migrate
 python manage.py runserver
 ```
+
+### Роли и пользователи
+
+После миграций автоматически создаются группы `Administrators` и `Analysts`.
+
+Пример создания локального пользователя:
+```bash
+cd backend
+python manage.py createsuperuser
+```
+
+Назначить роль можно в Django Admin (`/admin/`) через группы пользователя.
 
 ### Frontend (React)
 
@@ -144,11 +159,12 @@ npm run dev
 
 ## Безопасность
 
-- В Go backend включена ролевая модель:
-  - `admin` — полный доступ
-  - `analyst` — доступ только на чтение, включая экспорт отчётов
-- Пользователи хранятся локально в БД (`vm_auth_user`)
-- При пустой таблице пользователей создаётся bootstrap-аккаунт `admin` с паролем из `AUTH_BOOTSTRAP_PASSWORD` и флагом обязательной смены пароля при первом входе
+- Аутентификация обязательна, используется token-based API (`/api/auth/login/`, `/api/auth/logout/`, `/api/auth/me/`)
+- Локальные пользователи хранятся в БД Django (`auth_user`)
+- Роли (через группы Django):
+  - `Administrators` — полный доступ ко всем функциям
+  - `Analysts` — read-only по всем разделам + право на экспорт отчетов
+- Для будущей интеграции с LDAP предусмотрено сопоставление LDAP-групп в локальные роли через `LDAP_ROLE_GROUP_MAP`
 - Для продакшена рекомендуется:
   - Изменить `AUTH_BOOTSTRAP_PASSWORD`
   - Настроить LDAP (подготовлена таблица `auth_ldap_group_role_map` для сопоставления LDAP-групп и ролей)

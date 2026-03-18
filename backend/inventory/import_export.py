@@ -7,7 +7,7 @@ from rest_framework import status
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.permissions import AllowAny
+from .permissions import RoleBasedAccessPermission
 
 from .models import Department, Stream, InfoSystem, VM, Pool, PoolVM
 from .serializers import (
@@ -157,7 +157,7 @@ def _vm_tags_from_item(item, info_system):
 
 class ImportDepartmentsView(APIView):
     """Импорт департаментов из JSON. Поддерживается вложенное дерево streams -> info_systems."""
-    permission_classes = [AllowAny]
+    permission_classes = [RoleBasedAccessPermission]
 
     def post(self, request):
         data = request.data
@@ -201,7 +201,7 @@ class ImportDepartmentsView(APIView):
 
 class ImportStreamsView(APIView):
     """Импорт стримов из JSON. Можно передать department_id или вложенный department; вложенные info_systems создаются при отсутствии."""
-    permission_classes = [AllowAny]
+    permission_classes = [RoleBasedAccessPermission]
 
     def post(self, request):
         data = request.data
@@ -248,7 +248,7 @@ class ImportStreamsView(APIView):
 
 class ImportInfoSystemsView(APIView):
     """Импорт ИС из JSON. Можно передать stream_id или вложенный stream/department; при отсутствии создаются."""
-    permission_classes = [AllowAny]
+    permission_classes = [RoleBasedAccessPermission]
 
     def post(self, request):
         data = request.data
@@ -304,7 +304,7 @@ class ImportInfoSystemsView(APIView):
 
 class ImportVMsView(APIView):
     """Импорт ВМ из JSON. Можно передать info_system_id или вложенную иерархию info_system/stream/department; при отсутствии создаются."""
-    permission_classes = [AllowAny]
+    permission_classes = [RoleBasedAccessPermission]
 
     def post(self, request):
         data = request.data
@@ -347,7 +347,7 @@ class ImportVMsView(APIView):
 
 class ImportPoolsView(APIView):
     """Импорт пулов из JSON. Передаётся массив объектов с name и опционально vm_fqdns (список FQDN ВМ для добавления в пул)."""
-    permission_classes = [AllowAny]
+    permission_classes = [RoleBasedAccessPermission]
 
     def post(self, request):
         from django.utils import timezone
@@ -396,8 +396,285 @@ class ImportPoolsView(APIView):
         return Response({'created': len(created), 'updated': len(updated), 'ids': created + updated})
 
 
+def _as_list(value):
+    return value if isinstance(value, list) else []
+
+
+def _result_block(items_created, items_updated, errors):
+    return {
+        'created': len(items_created),
+        'updated': len(items_updated),
+        'ids': items_created + items_updated,
+        'errors': errors,
+    }
+
+
+class ImportBulkFromFileView(APIView):
+    """
+    Массовый импорт из "единого" JSON файла:
+    departments -> streams -> info_systems -> vms.
+
+    Под капотом используется та же логика создания/обновления, что и у эндпоинтов /v1/*/import.
+    """
+
+    permission_classes = [RoleBasedAccessPermission]
+
+    def post(self, request):
+        from django.core.files.uploadedfile import UploadedFile
+        import json
+
+        uploaded = request.FILES.get('file')
+        if not uploaded:
+            return Response({'error': 'Файл импорта обязателен (multipart/form-data, поле "file")'},
+                            status=status.HTTP_400_BAD_REQUEST)
+        if not isinstance(uploaded, UploadedFile):
+            return Response({'error': 'Поле "file" должно быть файлом'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            raw = uploaded.read().decode('utf-8')
+            data = json.loads(raw)
+        except Exception:
+            return Response({'error': 'Некорректный JSON в файле импорта'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        if not isinstance(data, dict):
+            return Response({'error': 'Ожидается JSON-объект верхнего уровня'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        overall_errors = []
+        def _get_optional_list(key):
+            if key not in data or data.get(key) is None:
+                return []
+            if isinstance(data.get(key), list):
+                return data.get(key) or []
+            overall_errors.append({'key': key, 'error': 'Ожидается массив (JSON list)'})
+            return []
+
+        departments = _get_optional_list('departments')
+        streams = _get_optional_list('streams')
+        info_systems = _get_optional_list('info_systems')
+        vms = _get_optional_list('vms')
+
+        # 1) Departments (создаём дерево Department -> Stream -> InfoSystem при отсутствии)
+        dept_created, dept_updated = [], []
+        dept_errors = []
+        for idx, item in enumerate(departments):
+            try:
+                name = (item.get('name') or '').strip()
+                if not name:
+                    dept_errors.append({'index': idx, 'error': 'Поле name обязательно'})
+                    continue
+
+                short_name = (item.get('short_name') or '').strip()
+                cpu_quota = item.get('cpu_quota', None)
+                ram_quota = item.get('ram_quota', None)
+                disk_quota = item.get('disk_quota', None)
+
+                dept = _get_or_create_department(
+                    name=name,
+                    short_name=short_name,
+                    cpu_quota=cpu_quota,
+                    ram_quota=ram_quota,
+                    disk_quota=disk_quota,
+                )
+
+                created_flag = dept.id not in (dept_created + dept_updated)
+                (dept_created if created_flag else dept_updated).append(dept.id)
+
+                for s in item.get('streams') or []:
+                    sname = (s.get('name') or '').strip()
+                    if not sname:
+                        continue
+                    stream, _ = Stream.objects.get_or_create(name=sname, department=dept, defaults={})
+                    for is_item in s.get('info_systems') or []:
+                        iname = (is_item.get('name') or '').strip()
+                        if not iname:
+                            continue
+                        _get_or_create_infosystem(
+                            iname, stream,
+                            code=is_item.get('code'),
+                            is_id=is_item.get('is_id'),
+                        )
+            except Exception as e:
+                dept_errors.append({'index': idx, 'error': str(e)})
+
+        overall_errors.extend(dept_errors)
+
+        # 2) Streams (опционально, если не передавать через departments.streams)
+        stream_created, stream_updated = [], []
+        stream_errors = []
+        for idx, item in enumerate(streams):
+            try:
+                name = (item.get('name') or '').strip()
+                if not name:
+                    stream_errors.append({'index': idx, 'error': 'Поле name обязательно'})
+                    continue
+
+                dept = None
+                if item.get('department_id'):
+                    try:
+                        dept = Department.objects.get(pk=item['department_id'])
+                    except Department.DoesNotExist:
+                        dept = None
+
+                if not dept and item.get('department'):
+                    dd = item['department']
+                    dept = _get_or_create_department(
+                        dd.get('name', ''),
+                        short_name=dd.get('short_name'),
+                        cpu_quota=dd.get('cpu_quota'),
+                        ram_quota=dd.get('ram_quota'),
+                        disk_quota=dd.get('disk_quota'),
+                    )
+
+                if not dept:
+                    stream_errors.append({'index': idx, 'error': 'Департамент не найден для стрима'})
+                    continue
+
+                stream, created_flag = Stream.objects.get_or_create(
+                    name=name, department=dept, defaults={},
+                )
+                (stream_created if created_flag else stream_updated).append(stream.id)
+
+                for is_item in item.get('info_systems') or []:
+                    iname = (is_item.get('name') or '').strip()
+                    if not iname:
+                        continue
+                    _get_or_create_infosystem(
+                        iname, stream,
+                        code=is_item.get('code'),
+                        is_id=is_item.get('is_id'),
+                    )
+            except Exception as e:
+                stream_errors.append({'index': idx, 'error': str(e)})
+
+        overall_errors.extend(stream_errors)
+
+        # 3) InfoSystems (опционально, если не передавать через tree выше)
+        is_created, is_updated = [], []
+        is_errors = []
+        for idx, item in enumerate(info_systems):
+            try:
+                name = (item.get('name') or '').strip()
+                if not name:
+                    is_errors.append({'index': idx, 'error': 'Поле name обязательно'})
+                    continue
+
+                stream = None
+                if item.get('stream_id'):
+                    try:
+                        stream = Stream.objects.get(pk=item['stream_id'])
+                    except Stream.DoesNotExist:
+                        stream = None
+
+                if not stream and item.get('stream'):
+                    sd = item['stream']
+                    dept = None
+                    if sd.get('department_id'):
+                        try:
+                            dept = Department.objects.get(pk=sd['department_id'])
+                        except Department.DoesNotExist:
+                            dept = None
+                    if not dept and sd.get('department'):
+                        dd = sd['department']
+                        dept = _get_or_create_department(
+                            dd.get('name', ''),
+                            short_name=dd.get('short_name'),
+                            cpu_quota=dd.get('cpu_quota'),
+                            ram_quota=dd.get('ram_quota'),
+                            disk_quota=dd.get('disk_quota'),
+                        )
+                    if dept:
+                        stream = _get_or_create_stream(sd.get('name', ''), dept)
+
+                if not stream:
+                    is_errors.append({'index': idx, 'error': 'Стрим не найден для ИС'})
+                    continue
+
+                isys, created_flag = InfoSystem.objects.get_or_create(
+                    name=name,
+                    stream=stream,
+                    defaults={'code': (item.get('code') or '').strip(), 'is_id': (item.get('is_id') or '').strip()},
+                )
+                if not created_flag:
+                    if item.get('code') is not None:
+                        isys.code = (item.get('code') or '').strip()
+                    if item.get('is_id') is not None:
+                        isys.is_id = (item.get('is_id') or '').strip()
+                    isys.save()
+
+                (is_created if created_flag else is_updated).append(isys.id)
+            except Exception as e:
+                is_errors.append({'index': idx, 'error': str(e)})
+
+        overall_errors.extend(is_errors)
+
+        # 4) VMs
+        vm_created, vm_updated = [], []
+        vm_errors = []
+        for idx, item in enumerate(vms):
+            try:
+                fqdn = (item.get('fqdn') or '').strip()
+                if not fqdn:
+                    vm_errors.append({'index': idx, 'error': 'Поле fqdn обязательно'})
+                    continue
+
+                info_system = _resolve_infosystem(item)
+                tags = _vm_tags_from_item(item, info_system)
+
+                cpu = int(item.get('cpu') or 1)
+                ram = int(item.get('ram') or 1)
+                disk = int(item.get('disk') or 10)
+                instance = max(1, min(20, int(item.get('instance') or 1)))
+
+                payload = {
+                    'fqdn': fqdn,
+                    'ip': (item.get('ip') or '000.000.000.000').strip(),
+                    'cpu': cpu,
+                    'ram': ram,
+                    'disk': disk,
+                    'instance': instance,
+                    'tags': tags,
+                    'info_system': info_system,
+                }
+
+                vm, created_flag = VM.objects.update_or_create(
+                    fqdn=fqdn,
+                    defaults={
+                        'ip': payload['ip'],
+                        'cpu': payload['cpu'],
+                        'ram': payload['ram'],
+                        'disk': payload['disk'],
+                        'instance': payload['instance'],
+                        'tags': payload['tags'],
+                        'info_system': payload['info_system'],
+                    },
+                )
+                (vm_created if created_flag else vm_updated).append(vm.id)
+            except Exception as e:
+                vm_errors.append({'index': idx, 'error': str(e)})
+
+        overall_errors.extend(vm_errors)
+
+        result = {
+            'departments': _result_block(dept_created, dept_updated, dept_errors),
+            'streams': _result_block(stream_created, stream_updated, stream_errors),
+            'info_systems': _result_block(is_created, is_updated, is_errors),
+            'vms': _result_block(vm_created, vm_updated, vm_errors),
+        }
+        # Ошибки верхнего уровня (например, некорректный тип ключа) + ошибки из всех секций.
+        result['errors'] = overall_errors
+        result['totals'] = {
+            'created': sum(x['created'] for x in result.values() if isinstance(x, dict) and 'created' in x),
+            'updated': sum(x['updated'] for x in result.values() if isinstance(x, dict) and 'updated' in x),
+        }
+
+        return Response(result, status=status.HTTP_207_MULTI_STATUS if overall_errors else status.HTTP_200_OK)
+
+
 @api_view(['GET'])
-@permission_classes([AllowAny])
+@permission_classes([RoleBasedAccessPermission])
 def search(request):
     """Поиск по всем разделам или конкретному разделу: департаменты, стримы, ИС, ВМ, пулы.
     

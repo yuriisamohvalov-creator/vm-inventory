@@ -10,6 +10,9 @@ class Department(models.Model):
 
     class Meta:
         ordering = ['name']
+        permissions = [
+            ('can_export_reports', 'Can export reports'),
+        ]
 
     def __str__(self):
         return self.name

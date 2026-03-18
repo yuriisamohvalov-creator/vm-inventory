@@ -27,6 +27,10 @@ export default function Admin({ canWrite = false, userRole = '' }) {
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState({ ...INITIAL_FORM })
   const [error, setError] = useState('')
+  const [importFile, setImportFile] = useState(null)
+  const [importing, setImporting] = useState(false)
+  const [importError, setImportError] = useState('')
+  const [importResult, setImportResult] = useState(null)
   const [expandedDepts, setExpandedDepts] = useState(() => new Set())
   const [expandedStreams, setExpandedStreams] = useState(() => new Set())
   const [users, setUsers] = useState([])
@@ -110,6 +114,25 @@ export default function Admin({ canWrite = false, userRole = '' }) {
       load()
     } catch (err) {
       setError(err.body?.name?.[0] || err.body?.detail || err.message || 'Ошибка')
+    }
+  }
+
+  const handleBulkImport = async () => {
+    setImportError('')
+    setImportResult(null)
+    if (!importFile) {
+      setImportError('Выберите файл импорта (.json)')
+      return
+    }
+    setImporting(true)
+    try {
+      const r = await api.import.bulkFromFile(importFile)
+      setImportResult(r)
+      load()
+    } catch (err) {
+      setImportError(err.body?.error || err.body?.detail || err.message || 'Ошибка импорта')
+    } finally {
+      setImporting(false)
     }
   }
 
@@ -215,6 +238,41 @@ export default function Admin({ canWrite = false, userRole = '' }) {
           Роль {userRole}: доступ только на чтение.
         </p>
       )}
+      <div className="card">
+        <h3 style={{ marginTop: 0 }}>Массовый импорт (JSON)</h3>
+
+        <div className="form-group">
+          <label>Файл импорта</label>
+          <input
+            type="file"
+            accept="application/json,.json"
+            onChange={(e) => setImportFile(e.target.files?.[0] || null)}
+          />
+          <p className="empty-hint" style={{ marginTop: '0.5rem' }}>
+            Ожидается JSON-объект с ключами `departments`, `streams`, `info_systems`, `vms` (необязательно все).
+            Для VМ: обязательно поле `fqdn` и привязка к ИС через `info_system` (nested) или `info_system_id`.
+          </p>
+        </div>
+
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <button type="button" className="btn" disabled={importing} onClick={handleBulkImport}>
+            {importing ? 'Импортирую...' : 'Импортировать'}
+          </button>
+          {importFile && <span className="empty-hint">Файл: {importFile.name}</span>}
+        </div>
+
+        {importError && <p className="error-msg" style={{ marginTop: '0.75rem' }}>{importError}</p>}
+
+        {importResult && (
+          <div style={{ marginTop: '0.75rem' }}>
+            <p className="empty-hint" style={{ margin: 0 }}>Результат импорта:</p>
+            <pre style={{ background: '#111', color: '#eee', padding: '0.75rem', overflow: 'auto', borderRadius: 8 }}>
+              {JSON.stringify(importResult, null, 2)}
+            </pre>
+          </div>
+        )}
+      </div>
+
       <div className="card">
         <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
           {['departments', 'streams', 'info-systems', ...(canWrite ? ['users'] : [])].map((t) => (

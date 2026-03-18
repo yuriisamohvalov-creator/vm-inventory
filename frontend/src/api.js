@@ -1,24 +1,40 @@
 const API = '/api';
 const TOKEN_KEY = 'vm_inventory_token';
+const USER_KEY = 'vm_inventory_user';
 
-function getAuthToken() {
+export function getStoredToken() {
   return localStorage.getItem(TOKEN_KEY) || '';
 }
 
-function setAuthToken(token) {
+export function setStoredToken(token) {
   if (token) localStorage.setItem(TOKEN_KEY, token);
   else localStorage.removeItem(TOKEN_KEY);
 }
 
+export function getStoredUser() {
+  try {
+    const raw = localStorage.getItem(USER_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+export function setStoredUser(user) {
+  if (user) localStorage.setItem(USER_KEY, JSON.stringify(user));
+  else localStorage.removeItem(USER_KEY);
+}
+
 async function request(path, options = {}) {
   const url = path.startsWith('http') ? path : `${API}${path}`;
-  const token = getAuthToken();
+  const auth = options.auth !== false;
+  const token = getStoredToken();
   const headers = {
-    'Content-Type': 'application/json',
+    ...(auth && token ? { Authorization: `Token ${token}` } : {}),
     ...options.headers,
   };
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
+  if (!(options.body instanceof FormData) && !headers['Content-Type']) {
+    headers['Content-Type'] = 'application/json';
   }
   const res = await fetch(url, {
     ...options,
@@ -32,6 +48,10 @@ async function request(path, options = {}) {
     } catch (_) {
       err.body = await res.text();
     }
+    if (res.status === 401 && auth) {
+      setStoredToken('');
+      setStoredUser(null);
+    }
     throw err;
   }
   if (res.status === 204) return null;
@@ -41,34 +61,30 @@ async function request(path, options = {}) {
 }
 
 export const api = {
-  getAuthToken,
-  setAuthToken,
   auth: {
     login: async (username, password) => {
-      const response = await request('/auth/login/', {
+      const data = await request('/auth/login/', {
         method: 'POST',
         body: JSON.stringify({ username, password }),
+        auth: false,
       });
-      if (response?.token) setAuthToken(response.token);
-      return response;
+      setStoredToken(data.token);
+      setStoredUser(data.user);
+      return data;
     },
-    me: () => request('/auth/me/'),
+    me: async () => {
+      const user = await request('/auth/me/');
+      setStoredUser(user);
+      return user;
+    },
     logout: async () => {
       try {
         await request('/auth/logout/', { method: 'POST' });
-      } finally {
-        setAuthToken('');
+      } catch (_) {
+        // Ignore server-side logout errors; local logout still applies.
       }
-    },
-    changePassword: (currentPassword, newPassword) =>
-      request('/auth/change-password/', {
-        method: 'POST',
-        body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
-      }),
-    users: {
-      list: () => request('/auth/users/'),
-      create: (data) => request('/auth/users/', { method: 'POST', body: JSON.stringify(data) }),
-      update: (id, data) => request(`/auth/users/${id}/`, { method: 'PATCH', body: JSON.stringify(data) }),
+      setStoredToken('');
+      setStoredUser(null);
     },
   },
   departments: {
@@ -109,26 +125,46 @@ export const api = {
     addVm: (poolId, vmId) => request(`/pools/${poolId}/add-vm/${vmId}/`, { method: 'POST' }),
     removeVm: (poolId, vmId) => request(`/pools/${poolId}/remove-vm/${vmId}/`, { method: 'POST' }),
   },
+  import: {
+    /** Массовый импорт из единого JSON-файла (multipart/form-data, поле "file"). */
+    bulkFromFile: async (file) => {
+      const fd = new FormData()
+      fd.append('file', file)
+      return request('/v1/import/bulk', { method: 'POST', body: fd })
+    },
+  },
   report: {
     list: () => request('/report/'),
     /** Скачивание отчёта в PDF (возвращает Blob). */
     exportPdf: async () => {
       const url = `${API}/report/export/`;
-      const res = await fetch(url, { credentials: 'same-origin' });
+      const token = getStoredToken();
+      const res = await fetch(url, {
+        credentials: 'same-origin',
+        headers: token ? { Authorization: `Token ${token}` } : {},
+      });
       if (!res.ok) throw Object.assign(new Error(res.statusText), { status: res.status });
       return res.blob();
     },
     /** Скачивание отчёта в XLSX (возвращает Blob). */
     exportXlsx: async () => {
       const url = `${API}/v1/report/xlsx`;
-      const res = await fetch(url, { credentials: 'same-origin' });
+      const token = getStoredToken();
+      const res = await fetch(url, {
+        credentials: 'same-origin',
+        headers: token ? { Authorization: `Token ${token}` } : {},
+      });
       if (!res.ok) throw Object.assign(new Error(res.statusText), { status: res.status });
       return res.blob();
     },
     /** Скачивание отчёта в JSON (возвращает Blob). */
     exportJson: async () => {
       const url = `${API}/v1/report/json`;
-      const res = await fetch(url, { credentials: 'same-origin' });
+      const token = getStoredToken();
+      const res = await fetch(url, {
+        credentials: 'same-origin',
+        headers: token ? { Authorization: `Token ${token}` } : {},
+      });
       if (!res.ok) throw Object.assign(new Error(res.statusText), { status: res.status });
       return res.blob();
     },
