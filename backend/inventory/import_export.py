@@ -339,6 +339,8 @@ class ImportVMsView(APIView):
                     'instance': payload['instance'],
                     'tags': payload['tags'],
                     'info_system': payload['info_system'],
+                    'is_active': True,
+                    'deleted_at': None,
                 },
             )
             (created if created_flag else updated).append(vm.id)
@@ -371,7 +373,7 @@ class ImportPoolsView(APIView):
                 if not fqdn:
                     continue
                 try:
-                    vm = VM.objects.get(fqdn=fqdn)
+                    vm = VM.objects.get(fqdn=fqdn, is_active=True)
                 except VM.DoesNotExist:
                     continue
                 if instance_val is not None and vm.instance != instance_val:
@@ -649,6 +651,8 @@ class ImportBulkFromFileView(APIView):
                         'instance': payload['instance'],
                         'tags': payload['tags'],
                         'info_system': payload['info_system'],
+                        'is_active': True,
+                        'deleted_at': None,
                     },
                 )
                 (vm_created if created_flag else vm_updated).append(vm.id)
@@ -724,12 +728,13 @@ def search(request):
     # Поиск в ВМ
     if not section or section == 'vms':
         vms = VM.objects.filter(
-            Q(fqdn__icontains=q) | Q(ip__icontains=q)
+            Q(fqdn__icontains=q) | Q(ip__icontains=q),
+            is_active=True,
         ).select_related('info_system')[:50]
         # Также поиск по тегам
         if not vms.exists():
             # Поиск по тегам через JSONField
-            vms = VM.objects.filter(tags__icontains=q).select_related('info_system')[:50]
+            vms = VM.objects.filter(tags__icontains=q, is_active=True).select_related('info_system')[:50]
         result['vms'] = VMSerializer(vms, many=True).data
     else:
         result['vms'] = []
@@ -782,7 +787,7 @@ def report_json_response():
                 'info_systems': [],
             }
             for isys in stream.info_systems.all():
-                vms_qs = isys.vms.all()
+                vms_qs = isys.vms.filter(is_active=True)
                 vms_list = []
                 for vm in vms_qs:
                     vms_list.append({
@@ -845,7 +850,7 @@ def report_json_response():
             dept_has_exceeded = True
         dept_data['has_exceeded'] = dept_has_exceeded
         result.append(dept_data)
-    orphan_vms = VM.objects.filter(info_system__isnull=True)
+    orphan_vms = VM.objects.filter(info_system__isnull=True, is_active=True)
     if orphan_vms.exists():
         orphan_list = []
         for vm in orphan_vms:

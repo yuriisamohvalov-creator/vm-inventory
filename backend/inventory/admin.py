@@ -21,8 +21,8 @@ class InfoSystemAdmin(admin.ModelAdmin):
 
 @admin.register(VM)
 class VMAdmin(admin.ModelAdmin):
-    list_display = ('fqdn', 'ip', 'cpu', 'ram', 'disk', 'instance', 'info_system')
-    list_filter = ('instance',)
+    list_display = ('fqdn', 'ip', 'cpu', 'ram', 'disk', 'instance', 'info_system', 'is_active', 'created_at', 'updated_at', 'deleted_at')
+    list_filter = ('instance', 'is_active')
     search_fields = ('fqdn', 'ip')
 
 

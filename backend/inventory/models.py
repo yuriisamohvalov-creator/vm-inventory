@@ -80,6 +80,10 @@ class VM(models.Model):
     ba_programma_byudzheta = models.CharField(max_length=255, blank=True, null=True, help_text='БА.Программа_бюджета')
     ba_finansovaya_pozitsiya = models.CharField(max_length=255, default='00.00.00.00', help_text='БА.Финансовая_позиция')
     ba_mir_kod = models.CharField(max_length=255, default='ITI_000_0000', help_text='БА.Mir-код')
+    created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True, null=True, blank=True)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+    is_active = models.BooleanField(default=True)
 
     class Meta:
         ordering = ['instance', 'fqdn']

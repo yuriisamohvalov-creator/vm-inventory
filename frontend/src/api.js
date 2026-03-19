@@ -109,7 +109,7 @@ export const api = {
     delete: (id) => request(`/info-systems/${id}/`, { method: 'DELETE' }),
   },
   vms: {
-    list: () => request('/vms/'),
+    list: (includeDeleted = true) => request(includeDeleted ? '/vms/?include_deleted=1' : '/vms/'),
     get: (id) => request(`/vms/${id}/`),
     create: (data) => request('/vms/', { method: 'POST', body: JSON.stringify(data) }),
     update: (id, data) => request(`/vms/${id}/`, { method: 'PATCH', body: JSON.stringify(data) }),
