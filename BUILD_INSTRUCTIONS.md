@@ -4,7 +4,7 @@
 
 The project uses a custom tagging system for Docker images in the format: `<git-branch>-DDMMYYYY-HHMM`
 
-- `<git-branch>` - current git branch name (for example, `go-version-develop`)
+- `<git-branch>` - current git branch name (for example, `main`)
 - `DDMMYYYY` - current date (for example, `12032026`)
 - `HHMM` - current time in 24-hour format (for example, `1542`)
 
@@ -31,14 +31,14 @@ If you prefer to build manually:
 docker-compose build --no-cache
 
 # Tag images manually (example)
-docker tag vm-inventory_backend backend:go-version-develop-12032026-1542
-docker tag vm-inventory_frontend frontend:go-version-develop-12032026-1542
-docker tag vm-inventory_nginx nginx:go-version-develop-12032026-1542
+docker tag vm-inventory_backend backend:main-12032026-1542
+docker tag vm-inventory_frontend frontend:main-12032026-1542
+docker tag vm-inventory_nginx nginx:main-12032026-1542
 ```
 
 ## Example Tags
 
-- Build on branch `go-version-develop`: `go-version-develop-12032026-1542`
+- Build on branch `main`: `main-12032026-1542`
 - Build on branch `feature/api`: `feature-api-12032026-1542` (slash is replaced with `-`)
 
 ## Running with Custom Tags
