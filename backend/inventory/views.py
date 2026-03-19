@@ -196,6 +196,16 @@ class VMViewSet(viewsets.ModelViewSet):
         instance.deleted_at = timezone.now()
         instance.save(update_fields=['is_active', 'deleted_at', 'updated_at'])
 
+    @action(detail=True, methods=['post'])
+    def restore(self, request, pk=None):
+        vm = self.get_object()
+        if vm.is_active:
+            return Response({'status': 'ok', 'detail': 'VM уже активна'})
+        vm.is_active = True
+        vm.deleted_at = None
+        vm.save(update_fields=['is_active', 'deleted_at', 'updated_at'])
+        return Response({'status': 'ok'})
+
 
 def sync_pool_tags(pool, added_pv=None):
     """

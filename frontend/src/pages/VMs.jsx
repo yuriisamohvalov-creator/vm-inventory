@@ -524,6 +524,24 @@ export default function VMs({ canWrite = false }) {
                                 >
                                   Удалить
                                 </button>
+                                <button
+                                  className="btn btn-sm"
+                                  style={{ marginLeft: '0.5rem' }}
+                                  disabled={vm.is_active}
+                                  onClick={async () => {
+                                    if (!confirm('Восстановить ВМ?')) return
+                                    setDeleteError('')
+                                    try {
+                                      await api.vms.restore(vm.id)
+                                      load()
+                                    } catch (err) {
+                                      const msg = err.body?.detail || err.body?.error || err.message || 'Не удалось восстановить ВМ'
+                                      setDeleteError(msg)
+                                    }
+                                  }}
+                                >
+                                  Восстановить
+                                </button>
                               </td>
                             </tr>
                           ))}

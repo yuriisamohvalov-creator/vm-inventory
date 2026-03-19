@@ -114,6 +114,7 @@ export const api = {
     create: (data) => request('/vms/', { method: 'POST', body: JSON.stringify(data) }),
     update: (id, data) => request(`/vms/${id}/`, { method: 'PATCH', body: JSON.stringify(data) }),
     delete: (id) => request(`/vms/${id}/`, { method: 'DELETE' }),
+    restore: (id) => request(`/vms/${id}/restore/`, { method: 'POST' }),
   },
   pools: {
     list: () => request('/pools/'),
