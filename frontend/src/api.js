@@ -86,6 +86,12 @@ export const api = {
       setStoredToken('');
       setStoredUser(null);
     },
+    users: {
+      list: () => request('/auth/users/'),
+      create: (data) => request('/auth/users/', { method: 'POST', body: JSON.stringify(data) }),
+      update: (id, data) => request(`/auth/users/${id}/`, { method: 'PATCH', body: JSON.stringify(data) }),
+      delete: (id) => request(`/auth/users/${id}/`, { method: 'DELETE' }),
+    },
   },
   departments: {
     list: () => request('/departments/'),
