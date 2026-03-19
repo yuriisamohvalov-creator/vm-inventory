@@ -7,6 +7,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from .models import UserProfile
 from .rbac import ROLE_ADMIN, ROLE_ANALYST, get_user_roles, is_admin, role_labels_for_user, sync_user_roles
 
 
@@ -32,6 +33,7 @@ def _apply_ldap_role_mapping_if_present(user, provider, username):
 
 
 def _serialize_user(user):
+    profile, _ = UserProfile.objects.get_or_create(user=user)
     return {
         'id': user.id,
         'username': user.username,
@@ -39,6 +41,7 @@ def _serialize_user(user):
         'role_labels': role_labels_for_user(user),
         'is_superuser': user.is_superuser,
         'can_export_reports': user.has_perm('inventory.can_export_reports') or user.is_superuser,
+        'must_change_password': profile.must_change_password,
     }
 
 
@@ -91,14 +94,14 @@ class MeView(APIView):
 def _serialize_managed_user(user):
     roles = get_user_roles(user)
     role = ROLE_ADMIN if ROLE_ADMIN in roles else ROLE_ANALYST
+    profile, _ = UserProfile.objects.get_or_create(user=user)
     return {
         'id': user.id,
         'username': user.username,
         'role': role,
         'roles': roles,
         'is_active': user.is_active,
-        # Reserved for compatibility with existing frontend form.
-        'must_change_password': False,
+        'must_change_password': profile.must_change_password,
     }
 
 
@@ -136,6 +139,7 @@ class UsersView(APIView):
         password = request.data.get('password') or ''
         role = (request.data.get('role') or ROLE_ANALYST).strip()
         is_active = _to_bool(request.data.get('is_active', True), default=True)
+        must_change_password = _to_bool(request.data.get('must_change_password', False), default=False)
 
         if not username:
             return Response({'error': 'Логин обязателен.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -148,6 +152,10 @@ class UsersView(APIView):
 
         user = User.objects.create_user(username=username, password=password, is_active=is_active)
         sync_user_roles(user, [role])
+        UserProfile.objects.update_or_create(
+            user=user,
+            defaults={'must_change_password': must_change_password},
+        )
         return Response(_serialize_managed_user(user), status=status.HTTP_201_CREATED)
 
 
@@ -171,6 +179,7 @@ class UserDetailView(APIView):
         role = request.data.get('role')
         password = request.data.get('password')
         is_active = request.data.get('is_active')
+        must_change_password = request.data.get('must_change_password')
 
         if role is not None:
             role = str(role).strip()
@@ -185,6 +194,10 @@ class UserDetailView(APIView):
             user.is_active = _to_bool(is_active, default=user.is_active)
 
         user.save()
+        if must_change_password is not None:
+            profile, _ = UserProfile.objects.get_or_create(user=user)
+            profile.must_change_password = _to_bool(must_change_password, default=profile.must_change_password)
+            profile.save(update_fields=['must_change_password', 'updated_at'])
         return Response(_serialize_managed_user(user))
 
     def delete(self, request, user_id):

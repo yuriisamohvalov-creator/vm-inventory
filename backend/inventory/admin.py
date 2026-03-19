@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Department, Stream, InfoSystem, VM, Pool, PoolVM
+from .models import Department, Stream, InfoSystem, VM, Pool, PoolVM, UserProfile
 
 
 @admin.register(Department)
@@ -34,3 +34,10 @@ class PoolAdmin(admin.ModelAdmin):
 @admin.register(PoolVM)
 class PoolVMAdmin(admin.ModelAdmin):
     list_display = ('pool', 'vm', 'added_at', 'removed_at')
+
+
+@admin.register(UserProfile)
+class UserProfileAdmin(admin.ModelAdmin):
+    list_display = ('user', 'must_change_password', 'created_at', 'updated_at')
+    list_filter = ('must_change_password',)
+    search_fields = ('user__username',)
