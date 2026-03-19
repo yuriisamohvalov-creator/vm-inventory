@@ -181,6 +181,31 @@ class VMViewSet(viewsets.ModelViewSet):
     queryset = VM.objects.select_related('info_system', 'info_system__stream', 'info_system__stream__department').all()
     serializer_class = VMSerializer
 
+    def get_queryset(self):
+        qs = super().get_queryset()
+        include_deleted = (self.request.query_params.get('include_deleted') or '').lower() in ('1', 'true', 'yes')
+        if include_deleted:
+            return qs
+        return qs.filter(is_active=True)
+
+    def perform_destroy(self, instance):
+        from django.utils import timezone
+        if not instance.is_active:
+            return
+        instance.is_active = False
+        instance.deleted_at = timezone.now()
+        instance.save(update_fields=['is_active', 'deleted_at', 'updated_at'])
+
+    @action(detail=True, methods=['post'])
+    def restore(self, request, pk=None):
+        vm = self.get_object()
+        if vm.is_active:
+            return Response({'status': 'ok', 'detail': 'VM уже активна'})
+        vm.is_active = True
+        vm.deleted_at = None
+        vm.save(update_fields=['is_active', 'deleted_at', 'updated_at'])
+        return Response({'status': 'ok'})
+
 
 def sync_pool_tags(pool, added_pv=None):
     """
@@ -250,7 +275,7 @@ class PoolViewSet(viewsets.ModelViewSet):
         """VMs that can be added to this pool (same instance as pool or any if pool empty)."""
         pool = self.get_object()
         instance_val = pool.instance_value()
-        qs = VM.objects.all().order_by('instance', 'fqdn')
+        qs = VM.objects.filter(is_active=True).order_by('instance', 'fqdn')
         if instance_val is not None:
             qs = qs.filter(instance=instance_val)
         in_pool_ids = set(
@@ -264,7 +289,7 @@ class PoolViewSet(viewsets.ModelViewSet):
     def add_vm(self, request, pk=None, vm_id=None):
         pool = self.get_object()
         try:
-            vm = VM.objects.get(pk=vm_id)
+            vm = VM.objects.get(pk=vm_id, is_active=True)
         except VM.DoesNotExist:
             return Response({'error': 'VM не найдена'}, status=status.HTTP_404_NOT_FOUND)
         instance_val = pool.instance_value()
@@ -447,7 +472,7 @@ class ReportViewSet(viewsets.ViewSet):
                     'info_systems': [],
                 }
                 for isys in stream.info_systems.all():
-                    vms_qs = isys.vms.all()
+                    vms_qs = isys.vms.filter(is_active=True)
                     vms_list = []
                     for vm in vms_qs:
                         # Проверка, удалена ли ИС
@@ -515,7 +540,7 @@ class ReportViewSet(viewsets.ViewSet):
             dept_data['has_exceeded'] = dept_has_exceeded
             result.append(dept_data)
         # Orphan VMs (info_system deleted)
-        orphan_vms = VM.objects.filter(info_system__isnull=True)
+        orphan_vms = VM.objects.filter(info_system__isnull=True, is_active=True)
         if orphan_vms.exists():
             orphan_list = []
             for vm in orphan_vms:

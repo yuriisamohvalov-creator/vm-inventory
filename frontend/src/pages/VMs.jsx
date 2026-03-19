@@ -37,6 +37,13 @@ export default function VMs({ canWrite = false }) {
   const [deleteError, setDeleteError] = useState('')
   const [ipWarning, setIpWarning] = useState('')
 
+  const formatDateTime = (value) => {
+    if (!value) return '—'
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return '—'
+    return date.toLocaleString('ru-RU')
+  }
+
   const load = () => {
     api.vms.list().then((r) => setVms(r.results || r)).catch(() => setVms([]))
     api.departments.list().then((r) => setDepartments(r.results || r)).catch(() => setDepartments([]))
@@ -153,7 +160,7 @@ export default function VMs({ canWrite = false }) {
       return
     }
     try {
-      const allVms = await api.vms.list()
+      const allVms = await api.vms.list(false)
       const vmsList = Array.isArray(allVms) ? allVms : (allVms.results || [])
       const duplicate = vmsList.find(vm => vm.ip === ip && (!editing || vm.id !== editing.id))
       if (duplicate) {
@@ -440,6 +447,7 @@ export default function VMs({ canWrite = false }) {
               <tr>
                 <th>FQDN</th>
                 <th>IP адрес</th>
+                <th>Статус</th>
                 <th>CPU</th>
                 <th>RAM</th>
                 <th>Диск</th>
@@ -450,6 +458,9 @@ export default function VMs({ canWrite = false }) {
                 <th>БА.Финансовая_позиция</th>
                 <th>БА.Mir-код</th>
                 <th>БА.Программа_бюджета</th>
+                <th>Создана</th>
+                <th>Изменена</th>
+                <th>Удалена</th>
                 <th>Действия</th>
               </tr>
             </thead>
@@ -457,22 +468,23 @@ export default function VMs({ canWrite = false }) {
               {Object.entries(groupedVms).map(([departmentId, departmentData]) => (
                 <Fragment key={`dept-${departmentId}`}>
                   <tr className="vm-group-row vm-group-row-department">
-                    <td colSpan={13}>{departmentData.departmentName}</td>
+                    <td colSpan={17}>{departmentData.departmentName}</td>
                   </tr>
                   {Object.entries(departmentData.streams).map(([streamId, streamData]) => (
                     <Fragment key={`stream-${departmentId}-${streamId}`}>
                       <tr className="vm-group-row vm-group-row-stream">
-                        <td colSpan={13}>{streamData.streamName}</td>
+                        <td colSpan={17}>{streamData.streamName}</td>
                       </tr>
                       {Object.entries(streamData.infoSystems).map(([infoSystemId, infoSystemData]) => (
                         <Fragment key={`is-${departmentId}-${streamId}-${infoSystemId}`}>
                           <tr className="vm-group-row vm-group-row-is">
-                            <td colSpan={13}>{infoSystemData.infoSystemName}</td>
+                            <td colSpan={17}>{infoSystemData.infoSystemName}</td>
                           </tr>
                           {infoSystemData.vms.map((vm) => (
                             <tr key={vm.id}>
                               <td>{vm.fqdn}</td>
                               <td>{vm.ip || '000.000.000.000'}</td>
+                              <td>{vm.is_active ? 'Активна' : 'Удалена'}</td>
                               <td>{vm.cpu}</td>
                               <td>{vm.ram}</td>
                               <td>{vm.disk}</td>
@@ -489,11 +501,15 @@ export default function VMs({ canWrite = false }) {
                               <td>{vm.ba_finansovaya_pozitsiya || '—'}</td>
                               <td>{vm.ba_mir_kod || '—'}</td>
                               <td>{vm.ba_programma_byudzheta || '—'}</td>
+                              <td>{formatDateTime(vm.created_at)}</td>
+                              <td>{formatDateTime(vm.updated_at)}</td>
+                              <td>{formatDateTime(vm.deleted_at)}</td>
                               <td>
-                                <button className="btn btn-sm btn-secondary" onClick={() => startEdit(vm)}>Редактировать</button>
+                                <button className="btn btn-sm btn-secondary" disabled={!vm.is_active} onClick={() => startEdit(vm)}>Редактировать</button>
                                 <button
                                   className="btn btn-sm btn-danger"
                                   style={{ marginLeft: '0.5rem' }}
+                                  disabled={!vm.is_active}
                                   onClick={async () => {
                                     if (!confirm('Удалить ВМ?')) return
                                     setDeleteError('')
@@ -508,6 +524,24 @@ export default function VMs({ canWrite = false }) {
                                 >
                                   Удалить
                                 </button>
+                                <button
+                                  className="btn btn-sm"
+                                  style={{ marginLeft: '0.5rem' }}
+                                  disabled={vm.is_active}
+                                  onClick={async () => {
+                                    if (!confirm('Восстановить ВМ?')) return
+                                    setDeleteError('')
+                                    try {
+                                      await api.vms.restore(vm.id)
+                                      load()
+                                    } catch (err) {
+                                      const msg = err.body?.detail || err.body?.error || err.message || 'Не удалось восстановить ВМ'
+                                      setDeleteError(msg)
+                                    }
+                                  }}
+                                >
+                                  Восстановить
+                                </button>
                               </td>
                             </tr>
                           ))}
@@ -519,7 +553,7 @@ export default function VMs({ canWrite = false }) {
               ))}
               {list.length === 0 && (
                 <tr>
-                  <td colSpan={13} className="empty-hint">Список ВМ пуст</td>
+                  <td colSpan={17} className="empty-hint">Список ВМ пуст</td>
                 </tr>
               )}
             </tbody>

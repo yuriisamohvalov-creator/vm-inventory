@@ -36,6 +36,8 @@ export default function Admin({ canWrite = false, userRole = '' }) {
   const [users, setUsers] = useState([])
   const [userEditing, setUserEditing] = useState(null)
   const [userForm, setUserForm] = useState({ ...INITIAL_USER_FORM })
+  const usersApi = api.auth?.users
+  const canManageUsers = canWrite && usersApi && typeof usersApi.list === 'function'
 
   const toggleDept = (id) => setExpandedDepts((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n })
   const toggleStream = (id) => setExpandedStreams((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n })
@@ -70,8 +72,10 @@ export default function Admin({ canWrite = false, userRole = '' }) {
     api.departments.list().then((r) => setDepartments(toList(r))).catch(() => setDepartments([]))
     api.streams.list().then((r) => setStreams(toList(r))).catch(() => setStreams([]))
     api.infoSystems.list().then((r) => setInfoSystems(toList(r))).catch(() => setInfoSystems([]))
-    if (canWrite) {
-      api.auth.users.list().then((r) => setUsers(Array.isArray(r) ? r : [])).catch(() => setUsers([]))
+    if (canManageUsers) {
+      usersApi.list().then((r) => setUsers(Array.isArray(r) ? r : [])).catch(() => setUsers([]))
+    } else {
+      setUsers([])
     }
   }
 
@@ -193,6 +197,7 @@ export default function Admin({ canWrite = false, userRole = '' }) {
   }
 
   const handleUserSave = async () => {
+    if (!canManageUsers) return
     setError('')
     try {
       if (!userEditing) {
@@ -204,7 +209,7 @@ export default function Admin({ canWrite = false, userRole = '' }) {
           setError('Пароль обязателен.')
           return
         }
-        await api.auth.users.create({
+        await usersApi.create({
           username: userForm.username.trim(),
           password: userForm.password,
           role: userForm.role,
@@ -220,7 +225,7 @@ export default function Admin({ canWrite = false, userRole = '' }) {
         if (userForm.password.trim()) {
           payload.password = userForm.password
         }
-        await api.auth.users.update(userEditing.id, payload)
+        await usersApi.update(userEditing.id, payload)
       }
       setUserEditing(null)
       setUserForm({ ...INITIAL_USER_FORM })
@@ -275,7 +280,7 @@ export default function Admin({ canWrite = false, userRole = '' }) {
 
       <div className="card">
         <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
-          {['departments', 'streams', 'info-systems', ...(canWrite ? ['users'] : [])].map((t) => (
+          {['departments', 'streams', 'info-systems', ...(canManageUsers ? ['users'] : [])].map((t) => (
             <button
               key={t}
               type="button"

@@ -86,6 +86,12 @@ export const api = {
       setStoredToken('');
       setStoredUser(null);
     },
+    users: {
+      list: () => request('/auth/users/'),
+      create: (data) => request('/auth/users/', { method: 'POST', body: JSON.stringify(data) }),
+      update: (id, data) => request(`/auth/users/${id}/`, { method: 'PATCH', body: JSON.stringify(data) }),
+      delete: (id) => request(`/auth/users/${id}/`, { method: 'DELETE' }),
+    },
   },
   departments: {
     list: () => request('/departments/'),
@@ -109,11 +115,12 @@ export const api = {
     delete: (id) => request(`/info-systems/${id}/`, { method: 'DELETE' }),
   },
   vms: {
-    list: () => request('/vms/'),
+    list: (includeDeleted = true) => request(includeDeleted ? '/vms/?include_deleted=1' : '/vms/'),
     get: (id) => request(`/vms/${id}/`),
     create: (data) => request('/vms/', { method: 'POST', body: JSON.stringify(data) }),
     update: (id, data) => request(`/vms/${id}/`, { method: 'PATCH', body: JSON.stringify(data) }),
     delete: (id) => request(`/vms/${id}/`, { method: 'DELETE' }),
+    restore: (id) => request(`/vms/${id}/restore/`, { method: 'POST' }),
   },
   pools: {
     list: () => request('/pools/'),

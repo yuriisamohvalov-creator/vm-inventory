@@ -72,6 +72,7 @@ class InfoSystemSerializer(serializers.ModelSerializer):
 class VMSerializer(serializers.ModelSerializer):
     info_system_name = serializers.SerializerMethodField()
     info_system_code = serializers.SerializerMethodField()
+    status = serializers.SerializerMethodField()
 
     class Meta:
         model = VM
@@ -79,14 +80,19 @@ class VMSerializer(serializers.ModelSerializer):
             'id', 'fqdn', 'ip', 'cpu', 'ram', 'disk', 'instance', 'tags',
             'info_system', 'info_system_name', 'info_system_code',
             'ba_pfm_zak', 'ba_pfm_isp', 'ba_programma_byudzheta',
-            'ba_finansovaya_pozitsiya', 'ba_mir_kod'
+            'ba_finansovaya_pozitsiya', 'ba_mir_kod',
+            'created_at', 'updated_at', 'deleted_at', 'is_active', 'status',
         ]
+        read_only_fields = ['created_at', 'updated_at', 'deleted_at', 'status']
 
     def get_info_system_name(self, obj):
         return obj.info_system.name if obj.info_system else None
 
     def get_info_system_code(self, obj):
         return (obj.info_system.code or '').strip() if obj.info_system else ''
+
+    def get_status(self, obj):
+        return 'active' if obj.is_active else 'deleted'
 
     def validate_fqdn(self, value):
         value = (value or '').strip()

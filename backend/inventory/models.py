@@ -1,4 +1,5 @@
 from django.db import models
+from django.conf import settings
 
 
 class Department(models.Model):
@@ -80,6 +81,10 @@ class VM(models.Model):
     ba_programma_byudzheta = models.CharField(max_length=255, blank=True, null=True, help_text='БА.Программа_бюджета')
     ba_finansovaya_pozitsiya = models.CharField(max_length=255, default='00.00.00.00', help_text='БА.Финансовая_позиция')
     ba_mir_kod = models.CharField(max_length=255, default='ITI_000_0000', help_text='БА.Mir-код')
+    created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True, null=True, blank=True)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+    is_active = models.BooleanField(default=True)
 
     class Meta:
         ordering = ['instance', 'fqdn']
@@ -126,3 +131,16 @@ class PoolVM(models.Model):
 
     def __str__(self):
         return f"{self.pool.name} — {self.vm.fqdn}"
+
+
+class UserProfile(models.Model):
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='inventory_profile')
+    must_change_password = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['user_id']
+
+    def __str__(self):
+        return f"profile:{self.user_id}"
