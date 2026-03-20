@@ -1,4 +1,4 @@
-import { Fragment, useState, useEffect, useMemo } from 'react'
+import { Fragment, useRef, useState, useEffect, useMemo } from 'react'
 import { api } from '../api'
 
 const OS_OPTIONS = [
@@ -28,6 +28,8 @@ const defaultForm = {
 }
 
 export default function VMs({ canWrite = false }) {
+  const requestDatePickerRef = useRef(null)
+  const deleteDatePickerRef = useRef(null)
   const [vms, setVms] = useState([])
   const [departments, setDepartments] = useState([])
   const [streams, setStreams] = useState([])
@@ -62,6 +64,15 @@ export default function VMs({ canWrite = false }) {
     const year = Number(m[3])
     const date = new Date(year, month - 1, day)
     return date.getFullYear() === year && date.getMonth() === (month - 1) && date.getDate() === day
+  }
+
+  const openPicker = (ref) => {
+    if (!ref?.current) return
+    if (typeof ref.current.showPicker === 'function') {
+      ref.current.showPicker()
+      return
+    }
+    ref.current.focus()
   }
 
   const formatDateTime = (value) => {
@@ -541,13 +552,23 @@ export default function VMs({ canWrite = false }) {
             </div>
             <div className="form-group">
               <label>Дата (dd.mm.yyyy)</label>
-              <input
-                value={form.request_date}
-                onChange={(e) => setForm((f) => ({ ...f, request_date: e.target.value }))}
-                placeholder="31.12.2026"
-              />
-              <div style={{ marginTop: '0.4rem' }}>
+              <div className="date-input-wrap">
                 <input
+                  value={form.request_date}
+                  onChange={(e) => setForm((f) => ({ ...f, request_date: e.target.value }))}
+                  placeholder="31.12.2026"
+                />
+                <button
+                  type="button"
+                  className="date-picker-btn"
+                  aria-label="Открыть календарь"
+                  onClick={() => openPicker(requestDatePickerRef)}
+                >
+                  📅
+                </button>
+                <input
+                  ref={requestDatePickerRef}
+                  className="date-picker-native"
                   type="date"
                   value={toIsoDate(form.request_date)}
                   onChange={(e) => setForm((f) => ({ ...f, request_date: toRuDate(e.target.value) }))}
@@ -697,13 +718,23 @@ export default function VMs({ canWrite = false }) {
             </div>
             <div className="form-group">
               <label>Дата (dd.mm.yyyy)</label>
-              <input
-                value={deleteModal.request_date}
-                onChange={(e) => setDeleteModal((d) => ({ ...d, request_date: e.target.value }))}
-                placeholder="31.12.2026"
-              />
-              <div style={{ marginTop: '0.4rem' }}>
+              <div className="date-input-wrap">
                 <input
+                  value={deleteModal.request_date}
+                  onChange={(e) => setDeleteModal((d) => ({ ...d, request_date: e.target.value }))}
+                  placeholder="31.12.2026"
+                />
+                <button
+                  type="button"
+                  className="date-picker-btn"
+                  aria-label="Открыть календарь"
+                  onClick={() => openPicker(deleteDatePickerRef)}
+                >
+                  📅
+                </button>
+                <input
+                  ref={deleteDatePickerRef}
+                  className="date-picker-native"
                   type="date"
                   value={toIsoDate(deleteModal.request_date)}
                   onChange={(e) => setDeleteModal((d) => ({ ...d, request_date: toRuDate(e.target.value) }))}

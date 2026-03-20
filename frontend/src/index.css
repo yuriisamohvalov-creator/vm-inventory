@@ -236,6 +236,44 @@ tr:hover td {
   cursor: not-allowed;
 }
 
+.date-input-wrap {
+  position: relative;
+}
+
+.date-input-wrap input {
+  padding-right: 2.6rem;
+}
+
+.date-picker-btn {
+  position: absolute;
+  right: 0.35rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1.9rem;
+  height: 1.9rem;
+  border: 1px solid #dbeafe;
+  border-radius: 6px;
+  background: #f8fafc;
+  color: #0f172a;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.date-picker-btn:hover {
+  background: #e2e8f0;
+}
+
+.date-picker-native {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
 .modal-overlay {
   position: fixed;
   inset: 0;
