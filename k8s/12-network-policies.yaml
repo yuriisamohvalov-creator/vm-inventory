@@ -1,0 +1,99 @@
+---
+# NetworkPolicy для backend - разрешить трафик только от frontend и Ingress
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: backend-network-policy
+  namespace: vm-inventory
+spec:
+  podSelector:
+    matchLabels:
+      app: vm-inventory-backend
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Трафик от frontend
+  - from:
+    - podSelector:
+        matchLabels:
+          app: vm-inventory-frontend
+    ports:
+    - protocol: TCP
+      port: 8000
+  # Трафик от Ingress Controller (обычно в другом namespace)
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 8000
+  # DNS
+  - to:
+    - podSelector: {}
+      namespaceSelector: {}
+    ports:
+    - protocol: UDP
+      port: 53
+  egress:
+  # Исходящие соединения к БД
+  - to:
+    - ipBlock:
+        cidr: 0.0.0.0/0  # Заменить на конкретный IP/CIDR сервера БД
+    ports:
+    - protocol: TCP
+      port: 5432
+  # DNS
+  - to:
+    - podSelector: {}
+      namespaceSelector: {}
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+
+---
+# NetworkPolicy для frontend
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: frontend-network-policy
+  namespace: vm-inventory
+spec:
+  podSelector:
+    matchLabels:
+      app: vm-inventory-frontend
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Трафик из интернета (Ingress)
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 80
+    - protocol: TCP
+      port: 443
+  egress:
+  # Трафик к backend
+  - to:
+    - podSelector:
+        matchLabels:
+          app: vm-inventory-backend
+    ports:
+    - protocol: TCP
+      port: 8000
+  # DNS
+  - to:
+    - podSelector: {}
+      namespaceSelector: {}
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53

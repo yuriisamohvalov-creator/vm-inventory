@@ -1,0 +1,118 @@
+---
+# Deployment для Frontend (React + Nginx)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vm-inventory-frontend
+  namespace: vm-inventory
+  labels:
+    app: vm-inventory-frontend
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: vm-inventory-frontend
+  template:
+    metadata:
+      labels:
+        app: vm-inventory-frontend
+    spec:
+      serviceAccountName: vm-inventory
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+        fsGroup: 101
+      
+      containers:
+      - name: frontend
+        image: vm-inventory-frontend:latest
+        imagePullPolicy: Always
+        
+        ports:
+        - containerPort: 80
+          name: http
+          protocol: TCP
+        - containerPort: 443
+          name: https
+          protocol: TCP
+        
+        # Healthchecks
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 80
+            scheme: HTTP
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+        
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 80
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 2
+        
+        # Resources
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "500m"
+        
+        # Security
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        
+        # Volumes
+        volumeMounts:
+        - name: nginx-cache
+          mountPath: /var/cache/nginx
+        - name: nginx-tmp
+          mountPath: /var/run
+        - name: nginx-conf
+          mountPath: /etc/nginx/
+          readOnly: true
+      
+      # Volumes
+      volumes:
+      - name: nginx-cache
+        emptyDir: {}
+      - name: nginx-tmp
+        emptyDir: {}
+      - name: nginx-conf
+        configMap:
+          name: nginx-config
+          defaultMode: 0644
+      
+      # Restart политика
+      restartPolicy: Always
+      
+      # Anti-affinity для распределения по узлам
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - vm-inventory-frontend
+              topologyKey: kubernetes.io/hostname

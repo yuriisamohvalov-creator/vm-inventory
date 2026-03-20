@@ -1,0 +1,23 @@
+---
+# Service для Frontend (LoadBalancer или NodePort)
+apiVersion: v1
+kind: Service
+metadata:
+  name: vm-inventory-frontend
+  namespace: vm-inventory
+  labels:
+    app: vm-inventory-frontend
+spec:
+  type: LoadBalancer  # Или NodePort если нет cloud provider
+  ports:
+  - port: 80
+    targetPort: 80
+    protocol: TCP
+    name: http
+  - port: 443
+    targetPort: 443
+    protocol: TCP
+    name: https
+  selector:
+    app: vm-inventory-frontend
+  # sessionAffinity: ClientIP  # Раскомментировать если нужно

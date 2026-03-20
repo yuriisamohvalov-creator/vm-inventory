@@ -1,0 +1,263 @@
+---
+# Deployment для Django Backend
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vm-inventory-backend
+  namespace: vm-inventory
+  labels:
+    app: vm-inventory-backend
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: vm-inventory-backend
+  template:
+    metadata:
+      labels:
+        app: vm-inventory-backend
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+    spec:
+      serviceAccountName: vm-inventory
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      
+      # Init контейнер для запуска миграций БД
+      initContainers:
+      - name: migrate
+        image: vm-inventory-backend:latest
+        imagePullPolicy: Always
+        command: 
+          - python
+          - manage.py
+          - migrate
+          - --noinput
+        env:
+        - name: DATABASE_URL
+          value: "postgresql://$(DATABASE_USER):$(DATABASE_PASSWORD)@$(DATABASE_HOST):$(DATABASE_PORT)/$(DATABASE_NAME)"
+        - name: DATABASE_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: vm-inventory-config
+              key: DATABASE_HOST
+        - name: DATABASE_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: vm-inventory-config
+              key: DATABASE_PORT
+        - name: DATABASE_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: vm-inventory-config
+              key: DATABASE_NAME
+        - name: DATABASE_USER
+          valueFrom:
+            configMapKeyRef:
+              name: vm-inventory-config
+              key: DATABASE_USER
+        - name: DATABASE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: vm-inventory-secret
+              key: DATABASE_PASSWORD
+        - name: SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: vm-inventory-secret
+              key: SECRET_KEY
+        - name: DEBUG
+          valueFrom:
+            configMapKeyRef:
+              name: vm-inventory-config
+              key: DEBUG
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+      
+      containers:
+      - name: backend
+        image: vm-inventory-backend:latest
+        imagePullPolicy: Always
+        
+        ports:
+        - containerPort: 8000
+          name: http
+          protocol: TCP
+        
+        # Переменные окружения из ConfigMap и Secret
+        env:
+        - name: DATABASE_URL
+          value: "postgresql://$(DATABASE_USER):$(DATABASE_PASSWORD)@$(DATABASE_HOST):$(DATABASE_PORT)/$(DATABASE_NAME)"
+        - name: DATABASE_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: vm-inventory-config
+              key: DATABASE_HOST
+        - name: DATABASE_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: vm-inventory-config
+              key: DATABASE_PORT
+        - name: DATABASE_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: vm-inventory-config
+              key: DATABASE_NAME
+        - name: DATABASE_USER
+          valueFrom:
+            configMapKeyRef:
+              name: vm-inventory-config
+              key: DATABASE_USER
+        - name: DATABASE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: vm-inventory-secret
+              key: DATABASE_PASSWORD
+        - name: SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: vm-inventory-secret
+              key: SECRET_KEY
+        - name: DEBUG
+          valueFrom:
+            configMapKeyRef:
+              name: vm-inventory-config
+              key: DEBUG
+        - name: ALLOWED_HOSTS
+          valueFrom:
+            configMapKeyRef:
+              name: vm-inventory-config
+              key: ALLOWED_HOSTS
+        - name: LDAP_URI
+          valueFrom:
+            configMapKeyRef:
+              name: vm-inventory-config
+              key: LDAP_URI
+        - name: LDAP_BIND_DN
+          valueFrom:
+            configMapKeyRef:
+              name: vm-inventory-config
+              key: LDAP_BIND_DN
+        - name: LDAP_BIND_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: vm-inventory-secret
+              key: LDAP_BIND_PASSWORD
+        - name: LDAP_USER_SEARCH_BASE
+          valueFrom:
+            configMapKeyRef:
+              name: vm-inventory-config
+              key: LDAP_USER_SEARCH_BASE
+        - name: LDAP_GROUPS_BASE
+          valueFrom:
+            configMapKeyRef:
+              name: vm-inventory-config
+              key: LDAP_GROUPS_BASE
+        - name: LDAP_ROLE_GROUP_MAP
+          valueFrom:
+            configMapKeyRef:
+              name: vm-inventory-config
+              key: LDAP_ROLE_GROUP_MAP
+        - name: AUTH_BOOTSTRAP_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: vm-inventory-secret
+              key: AUTH_BOOTSTRAP_USERNAME
+        - name: AUTH_BOOTSTRAP_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: vm-inventory-secret
+              key: AUTH_BOOTSTRAP_PASSWORD
+        - name: AUTH_BOOTSTRAP_ROLE
+          valueFrom:
+            secretKeyRef:
+              name: vm-inventory-secret
+              key: AUTH_BOOTSTRAP_ROLE
+        
+        # Healthchecks
+        livenessProbe:
+          httpGet:
+            path: /admin/login/
+            port: 8000
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        readinessProbe:
+          httpGet:
+            path: /admin/login/
+            port: 8000
+            scheme: HTTP
+          initialDelaySeconds: 20
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 2
+        
+        # Resources
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        
+        # Security
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        
+        # Volumes
+        volumeMounts:
+        - name: staticfiles
+          mountPath: /app/staticfiles
+        - name: tmp
+          mountPath: /tmp
+      
+      # Volumes
+      volumes:
+      - name: staticfiles
+        emptyDir: {}
+      - name: tmp
+        emptyDir: {}
+      
+      # Restart политика
+      restartPolicy: Always
+      
+      # Node affinity (если нужно распределение по узлам)
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - vm-inventory-backend
+              topologyKey: kubernetes.io/hostname

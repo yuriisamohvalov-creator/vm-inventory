@@ -1,0 +1,8 @@
+---
+# Namespace для приложения VM Inventory
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: vm-inventory
+  labels:
+    name: vm-inventory

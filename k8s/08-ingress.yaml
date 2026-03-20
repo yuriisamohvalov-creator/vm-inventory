@@ -1,0 +1,41 @@
+---
+# Ingress для маршрутизации на frontend и backend
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: vm-inventory-ingress
+  namespace: vm-inventory
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"  # Если используется cert-manager
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  ingressClassName: nginx  # или другой используемый Ingress Controller
+  tls:
+  - hosts:
+    - vm-inventory.example.com
+    secretName: vm-inventory-tls
+  rules:
+  - host: vm-inventory.example.com
+    http:
+      paths:
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: vm-inventory-backend
+            port:
+              number: 8000
+      - path: /admin
+        pathType: Prefix
+        backend:
+          service:
+            name: vm-inventory-backend
+            port:
+              number: 8000
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: vm-inventory-frontend
+            port:
+              number: 80

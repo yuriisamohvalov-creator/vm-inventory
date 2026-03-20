@@ -1,0 +1,67 @@
+---
+# ServiceAccount для приложения
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vm-inventory
+  namespace: vm-inventory
+
+---
+# ClusterRole для чтения конфигурации
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: vm-inventory-reader
+rules:
+- apiGroups: [""]
+  resources: ["configmaps", "secrets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["services"]
+  verbs: ["get", "list"]
+
+---
+# ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: vm-inventory-reader-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: vm-inventory-reader
+subjects:
+- kind: ServiceAccount
+  name: vm-inventory
+  namespace: vm-inventory
+
+---
+# Role для работы в пределах namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: vm-inventory-role
+  namespace: vm-inventory
+rules:
+- apiGroups: [""]
+  resources: ["pods", "pods/log"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["configmaps", "secrets"]
+  verbs: ["get", "list"]
+
+---
+# RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: vm-inventory-role-binding
+  namespace: vm-inventory
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: vm-inventory-role
+subjects:
+- kind: ServiceAccount
+  name: vm-inventory
+  namespace: vm-inventory

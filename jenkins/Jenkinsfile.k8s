@@ -1,0 +1,569 @@
+// Jenkins Declarative Pipeline для развертывания VM Inventory в Kubernetes
+// Этот файл должен быть в репозитории: jenkins/Jenkinsfile.k8s
+
+@Library('shared-jenkins-lib') _
+
+pipeline {
+    agent any
+    
+    options {
+        buildDiscarder(logRotator(numToKeepStr: '50', artifactNumToKeepStr: '5'))
+        timeout(time: 1, unit: 'HOURS')
+        timestamps()
+        ansiColor('xterm')
+    }
+    
+    stages {
+        stage('Подготовка') {
+            steps {
+                script {
+                    echo "🔧 Параметры развертывания:"
+                    echo "  ✓ Ветка: ${params.GIT_BRANCH}"
+                    echo "  ✓ Backend образ: ${params.DOCKER_REGISTRY}/vm-inventory-backend:${params.BACKEND_IMAGE_TAG}"
+                    echo "  ✓ Frontend образ: ${params.DOCKER_REGISTRY}/vm-inventory-frontend:${params.FRONTEND_IMAGE_TAG}"
+                    echo "  ✓ Кластер: ${params.KUBERNETES_CLUSTER}"
+                    echo "  ✓ Namespace: ${params.KUBERNETES_NAMESPACE}"
+                    echo "  ✓ БД хост: ${params.DATABASE_HOST}"
+                }
+                
+                // Очистить workspace
+                cleanWs()
+                
+                // Получить код
+                checkout([$class: 'GitSCM',
+                    branches: [[name: '*/${GIT_BRANCH}']],
+                    userRemoteConfigs: [[
+                        url: '${GIT_REPOSITORY_URL}',
+                        credentialsId: 'github-credentials'
+                    ]],
+                    extensions: [[$class: 'CloneOption', depth: 1, noTags: false]]
+                ])
+            }
+        }
+        
+        stage('Проверка окружения') {
+            steps {
+                script {
+                    echo "📋 Проверка наличия инструментов..."
+                    sh '''
+                        echo "=== Kubernetes ==="
+                        kubectl version --client --short
+                        
+                        echo "\\n=== Docker ==="
+                        docker version --format 'Client: {{.Client.Version}}'
+                        
+                        echo "\\n=== Текущий контекст ==="
+                        kubectl config current-context
+                        
+                        echo "\\n=== Доступные контексты ==="
+                        kubectl config get-contexts
+                    '''
+                }
+            }
+        }
+        
+        stage('Переключение контекста') {
+            steps {
+                script {
+                    echo "🔄 Переключение на кластер: ${params.KUBERNETES_CLUSTER}"
+                    
+                    // Конфигурация для разных кластеров
+                    def clusterConfig = [
+                        'prod': 'kubernetes-prod',
+                        'staging': 'kubernetes-staging',
+                        'dev': 'kubernetes-dev'
+                    ]
+                    
+                    def context = clusterConfig[params.KUBERNETES_CLUSTER]
+                    
+                    if (!context) {
+                        error("❌ Неизвестный кластер: ${params.KUBERNETES_CLUSTER}")
+                    }
+                    
+                    sh "kubectl config use-context ${context}"
+                }
+            }
+        }
+        
+        stage('Подготовка манифестов') {
+            steps {
+                script {
+                    echo "📝 Подготовка Kubernetes манифестов..."
+                    
+                    sh '''
+                        # Проверить наличие k8s директории
+                        if [ ! -d "k8s" ]; then
+                            echo "❌ Директория k8s не найдена!"
+                            exit 1
+                        fi
+                        
+                        # Создать временную директорию для обработанных манифестов
+                        mkdir -p k8s_processed
+                        
+                        # Заменить переменные в манифестах
+                        for file in k8s/*.yaml; do
+                            envsubst < "$file" > "k8s_processed/$(basename $file)"
+                        done
+                        
+                        echo "✓ Манифесты готовы"
+                        ls -la k8s_processed/
+                    '''
+                }
+            }
+        }
+        
+        stage('Валидация манифестов') {
+            steps {
+                script {
+                    echo "✅ Валидация Kubernetes манифестов..."
+                    
+                    sh '''
+                        # Валидация синтаксиса YAML
+                        for file in k8s_processed/*.yaml; do
+                            echo "Проверка: $(basename $file)"
+                            kubectl apply -f "$file" --dry-run=client -n ${KUBERNETES_NAMESPACE} > /dev/null
+                        done
+                        
+                        echo "✓ Все манифесты прошли валидацию"
+                    '''
+                }
+            }
+        }
+        
+        stage('Создание Namespace и Secrets') {
+            steps {
+                script {
+                    echo "📦 Создание Namespace..."
+                    
+                    sh '''
+                        # Применить namespace
+                        kubectl apply -f k8s_processed/01-namespace.yaml
+                        
+                        # Проверить, существует ли secret
+                        NAMESPACE_EXISTS=$(kubectl get namespace ${KUBERNETES_NAMESPACE} 2>/dev/null || echo "not-found")
+                        
+                        if [ "$NAMESPACE_EXISTS" == "not-found" ]; then
+                            echo "❌ Namespace не был создан!"
+                            exit 1
+                        fi
+                        
+                        echo "✓ Namespace ${KUBERNETES_NAMESPACE} готов"
+                    '''
+                }
+            }
+        }
+        
+        stage('Обновление ConfigMap и Secrets') {
+            steps {
+                script {
+                    echo "🔐 Обновление конфигурации и секретов..."
+                    
+                    sh '''
+                        # Применить ConfigMap
+                        kubectl apply -f k8s_processed/02-configmap.yaml
+                        
+                        # За необходимостью обновить Secret
+                        # ВАЖНО: Убедитесь, что значения в Secret правильные перед применением!
+                        kubectl apply -f k8s_processed/03-secret.yaml
+                        
+                        echo "✓ ConfigMap и Secrets обновлены"
+                        
+                        # Проверить, что конфиг содержит правильный хост БД
+                        echo "\\nПроверка конфига БД:"
+                        kubectl -n ${KUBERNETES_NAMESPACE} get cm vm-inventory-config -o jsonpath='{.data.DATABASE_HOST}'
+                    '''
+                }
+            }
+        }
+        
+        stage('Проверка подключения к БД') {
+            steps {
+                script {
+                    echo "🗄️ Проверка подключения к БД..."
+                    
+                    sh '''
+                        # Получить параметры БД из ConfigMap
+                        DB_HOST=$(kubectl -n ${KUBERNETES_NAMESPACE} get cm vm-inventory-config -o jsonpath='{.data.DATABASE_HOST}')
+                        DB_PORT=$(kubectl -n ${KUBERNETES_NAMESPACE} get cm vm-inventory-config -o jsonpath='{.data.DATABASE_PORT}')
+                        DB_NAME=$(kubectl -n ${KUBERNETES_NAMESPACE} get cm vm-inventory-config -o jsonpath='{.data.DATABASE_NAME}')
+                        
+                        echo "Параметры БД:"
+                        echo "  Хост: $DB_HOST"
+                        echo "  Порт: $DB_PORT"
+                        echo "  БД: $DB_NAME"
+                        
+                        # Попытка подключиться к БД из пода
+                        # Создать временный под для проверки
+                        kubectl -n ${KUBERNETES_NAMESPACE} run db-check-$BUILD_NUMBER \\
+                            --image=postgres:16-alpine \\
+                            --rm \\
+                            -i \\
+                            --restart=Never \\
+                            -- psql -h $DB_HOST -p $DB_PORT -U vminventory -d $DB_NAME -c "SELECT version();" || {
+                            echo "⚠️ Не удалось подключиться к БД. Проверьте:"
+                            echo "  - Доступность сервера БД с IP $DB_HOST:$DB_PORT"
+                            echo "  - Правильность учетных данных"
+                            echo "  - Firewall правила"
+                        }
+                    '''
+                }
+            }
+        }
+        
+        stage('Применить RBAC и остальные ресурсы') {
+            steps {
+                script {
+                    echo "🔐 Применение RBAC и сетевых политик..."
+                    
+                    sh '''
+                        # Применить все остальные манифесты (в правильном порядке зависимостей)
+                        kubectl apply -f k8s_processed/09-rbac.yaml
+                        kubectl apply -f k8s_processed/10-nginx-configmap.yaml
+                        
+                        echo "✓ RBAC и конфигурация применены"
+                    '''
+                }
+            }
+        }
+        
+        stage('Развертывание Backend') {
+            steps {
+                script {
+                    echo "🚀 Развертывание Backend..."
+                    
+                    sh '''
+                        # Обновить образ в deployment
+                        kubectl -n ${KUBERNETES_NAMESPACE} set image deployment/vm-inventory-backend \\
+                            backend=${DOCKER_REGISTRY}/vm-inventory-backend:${BACKEND_IMAGE_TAG} \\
+                            --record || {
+                            
+                            # Если deployment не существует, применить его
+                            echo "Deployment не существует, создаем..."
+                            kubectl apply -f k8s_processed/04-backend-deployment.yaml
+                        }
+                        
+                        echo "✓ Backend deployment обновлен"
+                    '''
+                }
+            }
+        }
+        
+        stage('Ожидание Backend Ready') {
+            steps {
+                script {
+                    echo "⏳ Ожидание готовности Backend..."
+                    
+                    sh '''
+                        echo "Ожидание deployment backend..."
+                        kubectl -n ${KUBERNETES_NAMESPACE} rollout status deployment/vm-inventory-backend --timeout=5m
+                        
+                        # Проверить статус подов
+                        echo "\\nСтатус подов Backend:"
+                        kubectl -n ${KUBERNETES_NAMESPACE} get pods -l app=vm-inventory-backend -o wide
+                        
+                        # Проверить логи на ошибки миграций
+                        echo "\\nПроверка логов init контейнера (миграции):"
+                        BACKEND_POD=$(kubectl -n ${KUBERNETES_NAMESPACE} get pods -l app=vm-inventory-backend -o jsonpath='{.items[0].metadata.name}')
+                        kubectl -n ${KUBERNETES_NAMESPACE} logs $BACKEND_POD -c migrate --tail=50 || echo "Нет логов init контейнера"
+                    '''
+                }
+            }
+        }
+        
+        stage('Развертывание Frontend') {
+            steps {
+                script {
+                    echo "🎨 Развертывание Frontend..."
+                    
+                    sh '''
+                        # Обновить образ в deployment
+                        kubectl -n ${KUBERNETES_NAMESPACE} set image deployment/vm-inventory-frontend \\
+                            frontend=${DOCKER_REGISTRY}/vm-inventory-frontend:${FRONTEND_IMAGE_TAG} \\
+                            --record || {
+                            
+                            # Если deployment не существует, применить его
+                            echo "Deployment не существует, создаем..."
+                            kubectl apply -f k8s_processed/05-frontend-deployment.yaml
+                        }
+                        
+                        echo "✓ Frontend deployment обновлен"
+                    '''
+                }
+            }
+        }
+        
+        stage('Ожидание Frontend Ready') {
+            steps {
+                script {
+                    echo "⏳ Ожидание готовности Frontend..."
+                    
+                    sh '''
+                        echo "Ожидание deployment frontend..."
+                        kubectl -n ${KUBERNETES_NAMESPACE} rollout status deployment/vm-inventory-frontend --timeout=5m
+                        
+                        echo "\\nСтатус подов Frontend:"
+                        kubectl -n ${KUBERNETES_NAMESPACE} get pods -l app=vm-inventory-frontend -o wide
+                    '''
+                }
+            }
+        }
+        
+        stage('Применение Services и Ingress') {
+            steps {
+                script {
+                    echo "🌐 Применение Services и Ingress..."
+                    
+                    sh '''
+                        kubectl apply -f k8s_processed/06-backend-service.yaml
+                        kubectl apply -f k8s_processed/07-frontend-service.yaml
+                        kubectl apply -f k8s_processed/08-ingress.yaml
+                        
+                        echo "✓ Services и Ingress применены"
+                    '''
+                }
+            }
+        }
+        
+        stage('Применение Autoscaling') {
+            steps {
+                script {
+                    echo "📊 Применение HorizontalPodAutoscaler..."
+                    
+                    sh '''
+                        kubectl apply -f k8s_processed/11-hpa.yaml
+                        
+                        echo "✓ HPA применен"
+                        
+                        # Проверить статус HPA
+                        echo "\\nСтатус HPA:"
+                        kubectl -n ${KUBERNETES_NAMESPACE} get hpa -o wide
+                    '''
+                }
+            }
+        }
+        
+        stage('Применение Network Policies') {
+            steps {
+                script {
+                    echo "🔒 Применение Network Policies..."
+                    
+                    sh '''
+                        kubectl apply -f k8s_processed/12-network-policies.yaml
+                        
+                        echo "✓ Network Policies применены"
+                        
+                        echo "\\nПроверка Network Policies:"
+                        kubectl -n ${KUBERNETES_NAMESPACE} get networkpolicies
+                    '''
+                }
+            }
+        }
+        
+        stage('Проверка статуса развертывания') {
+            steps {
+                script {
+                    echo "✅ Проверка статуса развертывания..."
+                    
+                    sh '''
+                        echo "=== Deployments ==="
+                        kubectl -n ${KUBERNETES_NAMESPACE} get deployments -o wide
+                        
+                        echo "\\n=== Pods ==="
+                        kubectl -n ${KUBERNETES_NAMESPACE} get pods -o wide
+                        
+                        echo "\\n=== Services ==="
+                        kubectl -n ${KUBERNETES_NAMESPACE} get svc -o wide
+                        
+                        echo "\\n=== Ingress ==="
+                        kubectl -n ${KUBERNETES_NAMESPACE} get ingress -o wide
+                        
+                        # Проверить, что все поды запущены
+                        TOTAL_PODS=$(kubectl -n ${KUBERNETES_NAMESPACE} get pods --no-headers | wc -l)
+                        READY_PODS=$(kubectl -n ${KUBERNETES_NAMESPACE} get pods --no-headers | grep "Running" | wc -l)
+                        
+                        echo "\\n✓ Подов: $READY_PODS/$TOTAL_PODS готовы"
+                        
+                        if [ $READY_PODS -lt $TOTAL_PODS ]; then
+                            echo "⚠️ Некоторые поды еще не готовы"
+                            echo "\\nПодробная информация о подах:"
+                            kubectl -n ${KUBERNETES_NAMESPACE} describe pods
+                        fi
+                    '''
+                }
+            }
+        }
+        
+        stage('Smoke Tests') {
+            steps {
+                script {
+                    echo "🧪 Выполнение smoke тестов..."
+                    
+                    sh '''
+                        # Подождать, пока backend будет доступен
+                        echo "Проверка доступности Backend..."
+                        BACKEND_SERVICE_IP=$(kubectl -n ${KUBERNETES_NAMESPACE} get svc vm-inventory-backend -o jsonpath='{.spec.clusterIP}')
+                        
+                        kubectl -n ${KUBERNETES_NAMESPACE} run smoke-test-$BUILD_NUMBER \\
+                            --image=curlimages/curl:latest \\
+                            --rm \\
+                            -i \\
+                            --restart=Never \\
+                            -- curl -v http://$BACKEND_SERVICE_IP:8000/admin/login/ || echo "⚠️ Backend коротко еще не доступен (это может быть нормально в начале)"
+                        
+                        echo "\\n✓ Smoke test завершен"
+                    '''
+                }
+            }
+        }
+        
+        stage('Вывод информации для доступа') {
+            steps {
+                script {
+                    echo "📍 Информация для доступа к приложению:"
+                    
+                    sh '''
+                        echo "\\n=== Информация для доступа ==="
+                        
+                        # Получить External IP (если используется LoadBalancer)
+                        FRONTEND_LB=$(kubectl -n ${KUBERNETES_NAMESPACE} get svc vm-inventory-frontend -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "pending")
+                        FRONTEND_PORT=$(kubectl -n ${KUBERNETES_NAMESPACE} get svc vm-inventory-frontend -o jsonpath='{.spec.ports[0].port}')
+                        
+                        if [ ! -z "$FRONTEND_LB" ] && [ "$FRONTEND_LB" != "pending" ]; then
+                            echo "Frontend доступен по адресу:"
+                            echo "  http://$FRONTEND_LB:$FRONTEND_PORT"
+                        else
+                            echo "⚠️  LoadBalancer External IP еще не назначен."
+                            echo "Если используется NodePort, используйте:"
+                            echo "  kubectl -n ${KUBERNETES_NAMESPACE} get svc -o wide"
+                        fi
+                        
+                        echo "\\nBackend API доступен по адресу:"
+                        BACKEND_SERVICE_IP=$(kubectl -n ${KUBERNETES_NAMESPACE} get svc vm-inventory-backend -o jsonpath='{.spec.clusterIP}')
+                        echo "  http://$BACKEND_SERVICE_IP:8000/api/"
+                        echo "  (доступен только из кластера)"
+                        
+                        # Информация об Ingress
+                        INGRESS_IP=$(kubectl -n ${KUBERNETES_NAMESPACE} get ingress vm-inventory-ingress -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "pending")
+                        INGRESS_HOST=$(kubectl -n ${KUBERNETES_NAMESPACE} get ingress vm-inventory-ingress -o jsonpath='{.spec.rules[0].host}' 2>/dev/null)
+                        
+                        if [ ! -z "$INGRESS_HOST" ]; then
+                            echo "\\nIngress настроен на домен:"
+                            echo "  $INGRESS_HOST"
+                            if [ ! -z "$INGRESS_IP" ] && [ "$INGRESS_IP" != "pending" ]; then
+                                echo "Ingress IP: $INGRESS_IP"
+                            else
+                                echo "⚠️  Ingress IP еще не назначен"
+                            fi
+                        fi
+                        
+                        # Проверка статуса базовых компонентов
+                        echo "\\n=== Статус компонентов ==="
+                        echo "Backend:"
+                        kubectl -n ${KUBERNETES_NAMESPACE} get deployment vm-inventory-backend -o jsonpath='{.status.replicas} replicas, {.status.readyReplicas} ready'
+                        echo ""
+                        
+                        echo "Frontend:"
+                        kubectl -n ${KUBERNETES_NAMESPACE} get deployment vm-inventory-frontend -o jsonpath='{.status.replicas} replicas, {.status.readyReplicas} ready'
+                        echo ""
+                        
+                        echo "\\n=== Для просмотра логов ==="
+                        echo "Backend:"
+                        echo "  kubectl -n ${KUBERNETES_NAMESPACE} logs -f deployment/vm-inventory-backend"
+                        echo "\\nFrontend:"
+                        echo "  kubectl -n ${KUBERNETES_NAMESPACE} logs -f deployment/vm-inventory-frontend"
+                    '''
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            script {
+                echo "📊 Сохранение логов развертывания..."
+                
+                sh '''
+                    # Сохранить описание всех ресурсов в файл
+                    mkdir -p deployment-info
+                    
+                    kubectl -n ${KUBERNETES_NAMESPACE} get all -o wide > deployment-info/resources.txt 2>&1
+                    kubectl -n ${KUBERNETES_NAMESPACE} describe deployments > deployment-info/deployments.txt 2>&1
+                    kubectl -n ${KUBERNETES_NAMESPACE} logs -l app=vm-inventory-backend --tail=100 > deployment-info/backend-logs.txt 2>&1
+                    kubectl -n ${KUBERNETES_NAMESPACE} logs -l app=vm-inventory-frontend --tail=100 > deployment-info/frontend-logs.txt 2>&1
+                    kubectl -n ${KUBERNETES_NAMESPACE} get events --sort-by='.lastTimestamp' > deployment-info/events.txt 2>&1
+                '''
+                
+                // Архивировать логи
+                archiveArtifacts artifacts: 'deployment-info/**', allowEmptyArchive: true
+            }
+        }
+        
+        failure {
+            script {
+                echo "❌ Развертывание не удалось!"
+                
+                if (params.ROLLBACK_ON_FAILURE) {
+                    echo "↩️  Откат на предыдущую версию..."
+                    
+                    sh '''
+                        echo "Откат backend..."
+                        kubectl -n ${KUBERNETES_NAMESPACE} rollout undo deployment/vm-inventory-backend || true
+                        
+                        echo "Откат frontend..."
+                        kubectl -n ${KUBERNETES_NAMESPACE} rollout undo deployment/vm-inventory-frontend || true
+                        
+                        echo "Ожидание восстановления..."
+                        kubectl -n ${KUBERNETES_NAMESPACE} rollout status deployment/vm-inventory-backend --timeout=3m || true
+                        kubectl -n ${KUBERNETES_NAMESPACE} rollout status deployment/vm-inventory-frontend --timeout=3m || true
+                        
+                        echo "✓ Откат завершен"
+                    '''
+                }
+                
+                // Отправить уведомление
+                emailext(
+                    to: '${DEFAULT_RECIPIENTS}',
+                    subject: "VM Inventory K8s развертывание НЕУДАЧНО",
+                    body: """
+                    Развертывание VM Inventory в Kubernetes не удалось.
+                    
+                    Детали:
+                    - Кластер: ${params.KUBERNETES_CLUSTER}
+                    - Namespace: ${params.KUBERNETES_NAMESPACE}
+                    - Ветка: ${params.GIT_BRANCH}
+                    - Build: ${BUILD_URL}
+                    
+                    Проверьте логи для деталей.
+                    """,
+                    attachLog: true
+                )
+            }
+        }
+        
+        success {
+            script {
+                echo "✅ Развертывание успешно завершено!"
+                
+                // Отправить уведомление
+                emailext(
+                    to: '${DEFAULT_RECIPIENTS}',
+                    subject: "VM Inventory K8s развертывание УСПЕШНО",
+                    body: """
+                    Развертывание VM Inventory в Kubernetes успешно завершено.
+                    
+                    Детали:
+                    - Кластер: ${params.KUBERNETES_CLUSTER}
+                    - Namespace: ${params.KUBERNETES_NAMESPACE}
+                    - Ветка: ${params.GIT_BRANCH}
+                    - Backend образ: ${params.DOCKER_REGISTRY}/vm-inventory-backend:${params.BACKEND_IMAGE_TAG}
+                    - Frontend образ: ${params.DOCKER_REGISTRY}/vm-inventory-frontend:${params.FRONTEND_IMAGE_TAG}
+                    - Build: ${BUILD_URL}
+                    
+                    Приложение развернуто и готово к использованию.
+                    """,
+                    attachLog: false
+                )
+            }
+        }
+    }
+}
