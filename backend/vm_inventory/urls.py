@@ -11,8 +11,8 @@ schema_view = get_schema_view(
         default_version='v1',
         description='API для учёта ВМ: справочники, импорт из JSON, поиск, отчёты.',
     ),
-    public=settings.DEBUG,
-    permission_classes=[permissions.AllowAny if settings.DEBUG else permissions.IsAdminUser],
+    public=True,
+    permission_classes=[permissions.AllowAny],
 )
 
 urlpatterns = [

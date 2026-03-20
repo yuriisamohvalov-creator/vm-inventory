@@ -4,6 +4,7 @@ import Admin from './pages/Admin'
 import VMs from './pages/VMs'
 import Pools from './pages/Pools'
 import Reports from './pages/Reports'
+import Requests from './pages/Requests'
 import Login from './pages/Login'
 import { api, getStoredToken, getStoredUser } from './api'
 
@@ -63,6 +64,7 @@ function App() {
           <nav>
             <NavLink to="/" end>Виртуальные машины</NavLink>
             <NavLink to="/pools">Общие пулы</NavLink>
+            <NavLink to="/requests">Заявки</NavLink>
             <NavLink to="/reports">Отчеты</NavLink>
             <NavLink to="/admin">Администрирование</NavLink>
             {/* Swagger и пользовательские инструкции открываются в новой вкладке,
@@ -82,6 +84,7 @@ function App() {
           <Routes>
             <Route path="/" element={<VMs canWrite={canWrite} />} />
             <Route path="/pools" element={<Pools canWrite={canWrite} />} />
+            <Route path="/requests" element={<Requests />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/admin" element={<Admin canWrite={canWrite} userRole={(user.roles || [])[0] || ''} />} />
           </Routes>
