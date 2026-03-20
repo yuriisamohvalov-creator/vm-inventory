@@ -31,6 +31,7 @@ export default function Admin({ canWrite = false, userRole = '' }) {
   const [importing, setImporting] = useState(false)
   const [importError, setImportError] = useState('')
   const [importResult, setImportResult] = useState(null)
+  const [showImportExample, setShowImportExample] = useState(false)
   const [expandedDepts, setExpandedDepts] = useState(() => new Set())
   const [expandedStreams, setExpandedStreams] = useState(() => new Set())
   const [users, setUsers] = useState([])
@@ -257,6 +258,13 @@ export default function Admin({ canWrite = false, userRole = '' }) {
             Ожидается JSON-объект с ключами `departments`, `streams`, `info_systems`, `vms` (необязательно все).
             Для VМ: обязательно поле `fqdn` и привязка к ИС через `info_system` (nested) или `info_system_id`.
           </p>
+          <button
+            type="button"
+            className="link-btn"
+            onClick={() => setShowImportExample(true)}
+          >
+            Показать пример JSON-файла для импорта
+          </button>
         </div>
 
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -277,6 +285,80 @@ export default function Admin({ canWrite = false, userRole = '' }) {
           </div>
         )}
       </div>
+      {showImportExample && (
+        <div className="modal-overlay" onClick={() => setShowImportExample(false)}>
+          <div className="modal import-example-modal" onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ marginTop: 0 }}>Пример JSON для массового импорта</h3>
+            <p className="empty-hint" style={{ marginTop: 0, paddingLeft: 0 }}>
+              Скопируйте пример и сохраните как файл `.json`, затем загрузите его в форму импорта.
+            </p>
+            <pre className="import-example-code">
+{`{
+  "departments": [
+    {
+      "name": "Департамент ИТ",
+      "short_name": "ДИТ",
+      "cpu_quota": 200,
+      "ram_quota": 512,
+      "disk_quota": 4000,
+      "streams": [
+        {
+          "name": "Бизнес-приложения",
+          "info_systems": [
+            { "name": "CRM", "code": "CRM_001", "is_id": "IS-CRM-001" }
+          ]
+        }
+      ]
+    }
+  ],
+  "streams": [
+    {
+      "name": "Интеграции",
+      "department": { "name": "Департамент ИТ", "short_name": "ДИТ" },
+      "info_systems": [
+        { "name": "ESB", "code": "ESB_001", "is_id": "IS-ESB-001" }
+      ]
+    }
+  ],
+  "info_systems": [
+    {
+      "name": "Portal",
+      "code": "PORTAL_001",
+      "is_id": "IS-PORTAL-001",
+      "stream": {
+        "name": "Внутренние сервисы",
+        "department": { "name": "Департамент ИТ", "short_name": "ДИТ" }
+      }
+    }
+  ],
+  "vms": [
+    {
+      "fqdn": "vm-crm-01.inno.local",
+      "ip": "10.10.10.11",
+      "cpu": 4,
+      "ram": 16,
+      "disk": 120,
+      "instance": 1,
+      "tags": ["LINUX", "CRM_001", "PROD"],
+      "info_system": {
+        "name": "CRM",
+        "code": "CRM_001",
+        "is_id": "IS-CRM-001",
+        "stream": {
+          "name": "Бизнес-приложения",
+          "department": { "name": "Департамент ИТ", "short_name": "ДИТ" }
+        }
+      }
+    }
+  ]
+}`}
+            </pre>
+            <button type="button" className="btn btn-secondary" onClick={() => setShowImportExample(false)}>
+              Закрыть
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="card">
         <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>

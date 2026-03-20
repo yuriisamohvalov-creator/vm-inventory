@@ -297,6 +297,36 @@ tr:hover td {
   margin: 0 0 1rem;
 }
 
+.link-btn {
+  background: none;
+  border: none;
+  color: #93c5fd;
+  padding: 0;
+  text-decoration: underline;
+  font-size: 0.9rem;
+}
+
+.link-btn:hover {
+  color: #bfdbfe;
+}
+
+.import-example-modal {
+  width: min(920px, 95vw);
+  max-height: 85vh;
+  overflow: auto;
+}
+
+.import-example-code {
+  background: #0b1220;
+  color: #e2e8f0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.9rem;
+  overflow: auto;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
 .tags-row {
   display: flex;
   flex-wrap: wrap;
