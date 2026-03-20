@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Руководство администратора</title>
+  <style>body{font-family:Arial,sans-serif;max-width:960px;margin:2rem auto;padding:0 1rem;line-height:1.55;color:#111827}code,pre{background:#f3f4f6;border-radius:6px;padding:.2rem .4rem}pre{padding:.8rem;overflow:auto}h1,h2{color:#0f172a}</style>
+</head>
+<body>
+  <h1>Руководство администратора VM Inventory</h1>
+  <p>Документ по развертыванию, администрированию пользователей и подготовке к Kubernetes.</p>
+
+  <h2>1. Развертывание (Docker/Podman)</h2>
+  <pre>cp .env.example .env
+docker compose up -d --build
+# или
+podman compose up -d --build</pre>
+
+  <h2>2. Создание пользователей</h2>
+  <ol>
+    <li>Войдите под администратором.</li>
+    <li>Откройте «Администрирование» → вкладку пользователей.</li>
+    <li>Создайте учетную запись и задайте роль.</li>
+  </ol>
+
+  <h2>3. Роли</h2>
+  <ul>
+    <li><b>administrator</b> — полный доступ.</li>
+    <li><b>analyst</b> — чтение и экспорт.</li>
+  </ul>
+
+  <h2>4. Эксплуатация</h2>
+  <pre>docker compose exec backend python manage.py migrate
+docker compose exec db pg_dump -U vminventory vminventory > backup.sql</pre>
+
+  <h2>5. Kubernetes readiness</h2>
+  <ul>
+    <li>ConfigMap/Secret для конфигурации.</li>
+    <li>Deployments для backend/frontend/nginx.</li>
+    <li>Ingress + TLS + health probes.</li>
+  </ul>
+</body>
+</html>
