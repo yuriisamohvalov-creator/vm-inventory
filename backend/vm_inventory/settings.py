@@ -1,11 +1,15 @@
 import os
 import json
+import logging
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-secret-key')
 
 DEBUG = os.environ.get('DEBUG', 'false').lower() in ('1', 'true', 'yes')
+
+if not DEBUG and SECRET_KEY in ('dev-secret-key', 'dev-secret-key-change-in-production'):
+    raise RuntimeError('SECRET_KEY must be set to a secure value in production')
 
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
@@ -111,8 +115,28 @@ REST_FRAMEWORK = {
     'PAGE_SIZE': 100,
 }
 
-# CORS: allow frontend
-CORS_ALLOW_ALL_ORIGINS = True
+# CORS
+CORS_ALLOW_ALL_ORIGINS = DEBUG and os.environ.get('CORS_ALLOW_ALL_ORIGINS', 'false').lower() in ('1', 'true', 'yes')
+CORS_ALLOWED_ORIGINS = [
+    o.strip()
+    for o in os.environ.get('CORS_ALLOWED_ORIGINS', '').split(',')
+    if o.strip()
+]
+
+if not DEBUG and CORS_ALLOW_ALL_ORIGINS:
+    raise RuntimeError('CORS_ALLOW_ALL_ORIGINS must be disabled in production')
+
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
+SESSION_COOKIE_HTTPONLY = True
+CSRF_COOKIE_HTTPONLY = True
+SECURE_HSTS_SECONDS = 31536000 if not DEBUG else 0
+SECURE_HSTS_INCLUDE_SUBDOMAINS = not DEBUG
+SECURE_HSTS_PRELOAD = not DEBUG
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_BROWSER_XSS_FILTER = True
+X_FRAME_OPTIONS = 'DENY'
 
 # Auth provider (no-auth by default; set LDAP_URI to enable LDAP)
 AUTH_PROVIDER = __import__('vm_inventory.auth_providers', fromlist=['get_auth_provider']).get_auth_provider(
@@ -131,3 +155,25 @@ try:
     LDAP_ROLE_GROUP_MAP = json.loads(_ldap_role_group_map_raw) if _ldap_role_group_map_raw else {}
 except json.JSONDecodeError:
     LDAP_ROLE_GROUP_MAP = {}
+
+
+LOG_LEVEL = os.environ.get('LOG_LEVEL', 'INFO').upper()
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'json': {
+            'format': '{"ts":"%(asctime)s","level":"%(levelname)s","logger":"%(name)s","message":"%(message)s"}',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'json',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': LOG_LEVEL,
+    },
+}

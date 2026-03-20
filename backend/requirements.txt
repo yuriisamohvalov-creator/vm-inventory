@@ -6,5 +6,7 @@ gunicorn>=21,<23
 reportlab>=4.0,<5
 openpyxl>=3.1,<4
 drf-yasg>=1.21,<2
+pytest>=8,<9
+pytest-django>=4.8,<5
 # LDAP (optional): uncomment and install system deps in Dockerfile (libldap2-dev libsasl2-dev) when needed
 # python-ldap>=3.4

@@ -2,6 +2,7 @@
 Import/export and search API for Swagger.
 Bulk create/update from JSON; create missing tree nodes as needed.
 """
+from django.db import transaction
 from django.db.models import Sum, Q
 from rest_framework import status
 from rest_framework.decorators import action, api_view, permission_classes
@@ -166,37 +167,40 @@ class ImportDepartmentsView(APIView):
         if not isinstance(data, list):
             return Response({'error': 'Ожидается JSON-массив'}, status=status.HTTP_400_BAD_REQUEST)
         created, updated = [], []
-        for item in data:
-            name = (item.get('name') or '').strip()
-            if not name:
-                continue
-            short_name = (item.get('short_name') or '').strip()
-            cpu_quota = item.get('cpu_quota')
-            ram_quota = item.get('ram_quota')
-            disk_quota = item.get('disk_quota')
-            dept = _get_or_create_department(
-                name=name,
-                short_name=short_name,
-                cpu_quota=cpu_quota,
-                ram_quota=ram_quota,
-                disk_quota=disk_quota,
-            )
-            created_flag = dept.id not in (created + updated)
-            (created if created_flag else updated).append(dept.id)
-            for s in item.get('streams') or []:
-                sname = (s.get('name') or '').strip()
-                if not sname:
+        with transaction.atomic():
+            for item in data:
+                name = (item.get('name') or '').strip()
+                if not name:
                     continue
-                stream, _ = Stream.objects.get_or_create(name=sname, department=dept, defaults={})
-                for is_item in s.get('info_systems') or []:
-                    iname = (is_item.get('name') or '').strip()
-                    if iname:
-                        _get_or_create_infosystem(
-                            iname, stream,
-                            code=is_item.get('code'),
-                            is_id=is_item.get('is_id'),
-                        )
-        return Response({'created': len(created), 'updated': len(updated), 'ids': created + updated})
+                short_name = (item.get('short_name') or '').strip()
+                cpu_quota = item.get('cpu_quota')
+                ram_quota = item.get('ram_quota')
+                disk_quota = item.get('disk_quota')
+                dept = _get_or_create_department(
+                    name=name,
+                    short_name=short_name,
+                    cpu_quota=cpu_quota,
+                    ram_quota=ram_quota,
+                    disk_quota=disk_quota,
+                )
+                created_flag = dept.id not in (created + updated)
+                (created if created_flag else updated).append(dept.id)
+                for s in item.get('streams') or []:
+                    sname = (s.get('name') or '').strip()
+                    if not sname:
+                        continue
+                    stream, _ = Stream.objects.get_or_create(name=sname, department=dept, defaults={})
+                    for is_item in s.get('info_systems') or []:
+                        iname = (is_item.get('name') or '').strip()
+                        if iname:
+                            _get_or_create_infosystem(
+                                iname, stream,
+                                code=is_item.get('code'),
+                                is_id=is_item.get('is_id'),
+                            )
+            if _dry_run_enabled(request):
+                transaction.set_rollback(True)
+        return Response({'created': len(created), 'updated': len(updated), 'ids': created + updated, 'dry_run': _dry_run_enabled(request)})
 
 
 class ImportStreamsView(APIView):
@@ -210,40 +214,43 @@ class ImportStreamsView(APIView):
         if not isinstance(data, list):
             return Response({'error': 'Ожидается JSON-массив'}, status=status.HTTP_400_BAD_REQUEST)
         created, updated = [], []
-        for item in data:
-            name = (item.get('name') or '').strip()
-            if not name:
-                continue
-            dept = None
-            if item.get('department_id'):
-                try:
-                    dept = Department.objects.get(pk=item['department_id'])
-                except Department.DoesNotExist:
-                    pass
-            if not dept and item.get('department'):
-                dd = item['department']
-                dept = _get_or_create_department(
-                    dd.get('name', ''),
-                    short_name=dd.get('short_name'),
-                    cpu_quota=dd.get('cpu_quota'),
-                    ram_quota=dd.get('ram_quota'),
-                    disk_quota=dd.get('disk_quota'),
-                )
-            if not dept:
-                return Response({'error': f'Департамент не найден для стрима: {name}'}, status=status.HTTP_400_BAD_REQUEST)
-            stream, created_flag = Stream.objects.get_or_create(
-                name=name, department=dept, defaults={},
-            )
-            (created if created_flag else updated).append(stream.id)
-            for is_item in item.get('info_systems') or []:
-                iname = (is_item.get('name') or '').strip()
-                if iname:
-                    _get_or_create_infosystem(
-                        iname, stream,
-                        code=is_item.get('code'),
-                        is_id=is_item.get('is_id'),
+        with transaction.atomic():
+            for item in data:
+                name = (item.get('name') or '').strip()
+                if not name:
+                    continue
+                dept = None
+                if item.get('department_id'):
+                    try:
+                        dept = Department.objects.get(pk=item['department_id'])
+                    except Department.DoesNotExist:
+                        pass
+                if not dept and item.get('department'):
+                    dd = item['department']
+                    dept = _get_or_create_department(
+                        dd.get('name', ''),
+                        short_name=dd.get('short_name'),
+                        cpu_quota=dd.get('cpu_quota'),
+                        ram_quota=dd.get('ram_quota'),
+                        disk_quota=dd.get('disk_quota'),
                     )
-        return Response({'created': len(created), 'updated': len(updated), 'ids': created + updated})
+                if not dept:
+                    return Response({'error': f'Департамент не найден для стрима: {name}'}, status=status.HTTP_400_BAD_REQUEST)
+                stream, created_flag = Stream.objects.get_or_create(
+                    name=name, department=dept, defaults={},
+                )
+                (created if created_flag else updated).append(stream.id)
+                for is_item in item.get('info_systems') or []:
+                    iname = (is_item.get('name') or '').strip()
+                    if iname:
+                        _get_or_create_infosystem(
+                            iname, stream,
+                            code=is_item.get('code'),
+                            is_id=is_item.get('is_id'),
+                        )
+            if _dry_run_enabled(request):
+                transaction.set_rollback(True)
+        return Response({'created': len(created), 'updated': len(updated), 'ids': created + updated, 'dry_run': _dry_run_enabled(request)})
 
 
 class ImportInfoSystemsView(APIView):
@@ -257,49 +264,52 @@ class ImportInfoSystemsView(APIView):
         if not isinstance(data, list):
             return Response({'error': 'Ожидается JSON-массив'}, status=status.HTTP_400_BAD_REQUEST)
         created, updated = [], []
-        for item in data:
-            name = (item.get('name') or '').strip()
-            if not name:
-                continue
-            stream = None
-            if item.get('stream_id'):
-                try:
-                    stream = Stream.objects.get(pk=item['stream_id'])
-                except Stream.DoesNotExist:
-                    pass
-            if not stream and item.get('stream'):
-                sd = item['stream']
-                dept = None
-                if sd.get('department_id'):
+        with transaction.atomic():
+            for item in data:
+                name = (item.get('name') or '').strip()
+                if not name:
+                    continue
+                stream = None
+                if item.get('stream_id'):
                     try:
-                        dept = Department.objects.get(pk=sd['department_id'])
-                    except Department.DoesNotExist:
+                        stream = Stream.objects.get(pk=item['stream_id'])
+                    except Stream.DoesNotExist:
                         pass
-                if not dept and sd.get('department'):
-                    dd = sd['department']
-                    dept = _get_or_create_department(
-                        dd.get('name', ''),
-                        short_name=dd.get('short_name'),
-                        cpu_quota=dd.get('cpu_quota'),
-                        ram_quota=dd.get('ram_quota'),
-                        disk_quota=dd.get('disk_quota'),
-                    )
-                if dept:
-                    stream = _get_or_create_stream(sd.get('name', ''), dept)
-            if not stream:
-                return Response({'error': f'Стрим не найден для ИС: {name}'}, status=status.HTTP_400_BAD_REQUEST)
-            isys, created_flag = InfoSystem.objects.get_or_create(
-                name=name, stream=stream,
-                defaults={'code': (item.get('code') or '').strip(), 'is_id': (item.get('is_id') or '').strip()},
-            )
-            if not created_flag:
-                if item.get('code') is not None:
-                    isys.code = (item.get('code') or '').strip()
-                if item.get('is_id') is not None:
-                    isys.is_id = (item.get('is_id') or '').strip()
-                isys.save()
-            (created if created_flag else updated).append(isys.id)
-        return Response({'created': len(created), 'updated': len(updated), 'ids': created + updated})
+                if not stream and item.get('stream'):
+                    sd = item['stream']
+                    dept = None
+                    if sd.get('department_id'):
+                        try:
+                            dept = Department.objects.get(pk=sd['department_id'])
+                        except Department.DoesNotExist:
+                            pass
+                    if not dept and sd.get('department'):
+                        dd = sd['department']
+                        dept = _get_or_create_department(
+                            dd.get('name', ''),
+                            short_name=dd.get('short_name'),
+                            cpu_quota=dd.get('cpu_quota'),
+                            ram_quota=dd.get('ram_quota'),
+                            disk_quota=dd.get('disk_quota'),
+                        )
+                    if dept:
+                        stream = _get_or_create_stream(sd.get('name', ''), dept)
+                if not stream:
+                    return Response({'error': f'Стрим не найден для ИС: {name}'}, status=status.HTTP_400_BAD_REQUEST)
+                isys, created_flag = InfoSystem.objects.get_or_create(
+                    name=name, stream=stream,
+                    defaults={'code': (item.get('code') or '').strip(), 'is_id': (item.get('is_id') or '').strip()},
+                )
+                if not created_flag:
+                    if item.get('code') is not None:
+                        isys.code = (item.get('code') or '').strip()
+                    if item.get('is_id') is not None:
+                        isys.is_id = (item.get('is_id') or '').strip()
+                    isys.save()
+                (created if created_flag else updated).append(isys.id)
+            if _dry_run_enabled(request):
+                transaction.set_rollback(True)
+        return Response({'created': len(created), 'updated': len(updated), 'ids': created + updated, 'dry_run': _dry_run_enabled(request)})
 
 
 class ImportVMsView(APIView):
@@ -313,38 +323,41 @@ class ImportVMsView(APIView):
         if not isinstance(data, list):
             return Response({'error': 'Ожидается JSON-массив'}, status=status.HTTP_400_BAD_REQUEST)
         created, updated = [], []
-        for item in data:
-            fqdn = (item.get('fqdn') or '').strip()
-            if not fqdn:
-                continue
-            info_system = _resolve_infosystem(item)
-            tags = _vm_tags_from_item(item, info_system)
-            payload = {
-                'fqdn': fqdn,
-                'ip': (item.get('ip') or '000.000.000.000').strip(),
-                'cpu': int(item.get('cpu') or 1),
-                'ram': int(item.get('ram') or 1),
-                'disk': int(item.get('disk') or 10),
-                'instance': max(1, min(20, int(item.get('instance') or 1))),
-                'tags': tags,
-                'info_system': info_system,
-            }
-            vm, created_flag = VM.objects.update_or_create(
-                fqdn=fqdn,
-                defaults={
-                    'ip': payload['ip'],
-                    'cpu': payload['cpu'],
-                    'ram': payload['ram'],
-                    'disk': payload['disk'],
-                    'instance': payload['instance'],
-                    'tags': payload['tags'],
-                    'info_system': payload['info_system'],
-                    'is_active': True,
-                    'deleted_at': None,
-                },
-            )
-            (created if created_flag else updated).append(vm.id)
-        return Response({'created': len(created), 'updated': len(updated), 'ids': created + updated})
+        with transaction.atomic():
+            for item in data:
+                fqdn = (item.get('fqdn') or '').strip()
+                if not fqdn:
+                    continue
+                info_system = _resolve_infosystem(item)
+                tags = _vm_tags_from_item(item, info_system)
+                payload = {
+                    'fqdn': fqdn,
+                    'ip': (item.get('ip') or '000.000.000.000').strip(),
+                    'cpu': int(item.get('cpu') or 1),
+                    'ram': int(item.get('ram') or 1),
+                    'disk': int(item.get('disk') or 10),
+                    'instance': max(1, min(20, int(item.get('instance') or 1))),
+                    'tags': tags,
+                    'info_system': info_system,
+                }
+                vm, created_flag = VM.objects.update_or_create(
+                    fqdn=fqdn,
+                    defaults={
+                        'ip': payload['ip'],
+                        'cpu': payload['cpu'],
+                        'ram': payload['ram'],
+                        'disk': payload['disk'],
+                        'instance': payload['instance'],
+                        'tags': payload['tags'],
+                        'info_system': payload['info_system'],
+                        'is_active': True,
+                        'deleted_at': None,
+                    },
+                )
+                (created if created_flag else updated).append(vm.id)
+            if _dry_run_enabled(request):
+                transaction.set_rollback(True)
+        return Response({'created': len(created), 'updated': len(updated), 'ids': created + updated, 'dry_run': _dry_run_enabled(request)})
 
 
 class ImportPoolsView(APIView):
@@ -352,50 +365,49 @@ class ImportPoolsView(APIView):
     permission_classes = [RoleBasedAccessPermission]
 
     def post(self, request):
-        from django.utils import timezone
         data = request.data
         if isinstance(data, dict) and 'items' in data:
             data = data['items']
         if not isinstance(data, list):
             return Response({'error': 'Ожидается JSON-массив'}, status=status.HTTP_400_BAD_REQUEST)
         created, updated = [], []
-        for item in data:
-            name = (item.get('name') or '').strip()
-            if not name:
-                continue
-            pool, created_flag = Pool.objects.get_or_create(name=name, defaults={})
-            (created if created_flag else updated).append(pool.id)
-            fqdns = item.get('vm_fqdns') or item.get('vms') or []
-            instance_val = pool.instance_value()
-            added_pvs = []
-            for fqdn in fqdns:
-                fqdn = (fqdn or '').strip()
-                if not fqdn:
+        with transaction.atomic():
+            for item in data:
+                name = (item.get('name') or '').strip()
+                if not name:
                     continue
-                try:
-                    vm = VM.objects.get(fqdn=fqdn, is_active=True)
-                except VM.DoesNotExist:
-                    continue
-                if instance_val is not None and vm.instance != instance_val:
-                    continue
-                pv, pv_created = PoolVM.objects.get_or_create(pool=pool, vm=vm, defaults={})
-                if not pv_created and pv.removed_at:
-                    pv.removed_at = None
-                    # Если ВМ была удалена и снова добавлена, восстанавливаем оригинальные теги из сохраненных
-                    if pv.original_tags:
-                        vm.tags = list(pv.original_tags)
-                        vm.save(update_fields=['tags'])
-                    pv.save()
-                added_pvs.append((pv, pv_created))
-            # Сохранить оригинальные теги для всех новых ВМ перед синхронизацией
-            for pv, pv_created in added_pvs:
-                if not pv.original_tags:
-                    pv.original_tags = list(pv.vm.tags or [])
-                    pv.save(update_fields=['original_tags'])
-            # Синхронизировать теги всех ВМ в пуле после добавления всех ВМ
-            from .views import sync_pool_tags
-            sync_pool_tags(pool)
-        return Response({'created': len(created), 'updated': len(updated), 'ids': created + updated})
+                pool, created_flag = Pool.objects.get_or_create(name=name, defaults={})
+                (created if created_flag else updated).append(pool.id)
+                fqdns = item.get('vm_fqdns') or item.get('vms') or []
+                instance_val = pool.instance_value()
+                added_pvs = []
+                for fqdn in fqdns:
+                    fqdn = (fqdn or '').strip()
+                    if not fqdn:
+                        continue
+                    try:
+                        vm = VM.objects.get(fqdn=fqdn, is_active=True)
+                    except VM.DoesNotExist:
+                        continue
+                    if instance_val is not None and vm.instance != instance_val:
+                        continue
+                    pv, pv_created = PoolVM.objects.get_or_create(pool=pool, vm=vm, defaults={})
+                    if not pv_created and pv.removed_at:
+                        pv.removed_at = None
+                        if pv.original_tags:
+                            vm.tags = list(pv.original_tags)
+                            vm.save(update_fields=['tags'])
+                        pv.save()
+                    added_pvs.append((pv, pv_created))
+                for pv, _ in added_pvs:
+                    if not pv.original_tags:
+                        pv.original_tags = list(pv.vm.tags or [])
+                        pv.save(update_fields=['original_tags'])
+                from .views import sync_pool_tags
+                sync_pool_tags(pool)
+            if _dry_run_enabled(request):
+                transaction.set_rollback(True)
+        return Response({'created': len(created), 'updated': len(updated), 'ids': created + updated, 'dry_run': _dry_run_enabled(request)})
 
 
 def _as_list(value):
@@ -409,6 +421,14 @@ def _result_block(items_created, items_updated, errors):
         'ids': items_created + items_updated,
         'errors': errors,
     }
+
+
+def _dry_run_enabled(request):
+    body_value = ''
+    if isinstance(request.data, dict):
+        body_value = request.data.get('dry_run') or ''
+    value = (request.query_params.get('dry_run') or body_value or '').__str__().lower()
+    return value in ('1', 'true', 'yes')
 
 
 class ImportBulkFromFileView(APIView):
@@ -752,154 +772,8 @@ def search(request):
 def report_json_response():
     """Собрать отчёт и вернуть HttpResponse с JSON и заголовком для скачивания."""
     from django.http import HttpResponse
-    from django.db.models import Sum
-    departments = Department.objects.prefetch_related(
-        'streams__info_systems__vms'
-    ).all()
-    result = []
-    for dept in departments:
-        dept_vm_count = 0
-        dept_sum_cpu = 0
-        dept_sum_ram = 0
-        dept_sum_disk = 0
-        # Проверка превышения квот
-        dept_has_exceeded = False
-        dept_data = {
-            'id': dept.id,
-            'name': dept.name,
-            'short_name': dept.short_name or '',
-            'cpu_quota': dept.cpu_quota,
-            'ram_quota': dept.ram_quota,
-            'disk_quota': dept.disk_quota,
-            'streams': []
-        }
-        for stream in dept.streams.all():
-            stream_vm_count = 0
-            stream_sum_cpu = 0
-            stream_sum_ram = 0
-            stream_sum_disk = 0
-            stream_data = {
-                'id': stream.id,
-                'name': stream.name,
-                'cpu_quota': stream.cpu_quota,
-                'ram_quota': stream.ram_quota,
-                'disk_quota': stream.disk_quota,
-                'info_systems': [],
-            }
-            for isys in stream.info_systems.all():
-                vms_qs = isys.vms.filter(is_active=True)
-                vms_list = []
-                for vm in vms_qs:
-                    vms_list.append({
-                        'fqdn': vm.fqdn,
-                        'ip': vm.ip,
-                        'cpu': vm.cpu,
-                        'ram': vm.ram,
-                        'disk': vm.disk,
-                        'ba_pfm_zak': vm.ba_pfm_zak,
-                        'ba_pfm_isp': vm.ba_pfm_isp,
-                        'ba_programma_byudzheta': vm.ba_programma_byudzheta,
-                        'ba_finansovaya_pozitsiya': vm.ba_finansovaya_pozitsiya,
-                        'ba_mir_kod': vm.ba_mir_kod,
-                        'info_system_deleted': vm.info_system is None,
-                    })
-                aggr = vms_qs.aggregate(sum_cpu=Sum('cpu'), sum_ram=Sum('ram'), sum_disk=Sum('disk'))
-                is_vm_count = len(vms_list)
-                is_sum_cpu = aggr['sum_cpu'] or 0
-                is_sum_ram = aggr['sum_ram'] or 0
-                is_sum_disk = aggr['sum_disk'] or 0
-                stream_data['info_systems'].append({
-                    'id': isys.id,
-                    'name': isys.name,
-                    'code': isys.code or '',
-                    'is_id': isys.is_id or '',
-                    'vms': vms_list,
-                    'vm_count': is_vm_count,
-                    'sum_cpu': is_sum_cpu,
-                    'sum_ram': is_sum_ram,
-                    'sum_disk': is_sum_disk,
-                })
-                stream_vm_count += is_vm_count
-                stream_sum_cpu += is_sum_cpu
-                stream_sum_ram += is_sum_ram
-                stream_sum_disk += is_sum_disk
-            stream_data['vm_count'] = stream_vm_count
-            stream_data['sum_cpu'] = stream_sum_cpu
-            stream_data['sum_ram'] = stream_sum_ram
-            stream_data['sum_disk'] = stream_sum_disk
-            stream_data['has_exceeded'] = (
-                (stream.cpu_quota > 0 and stream_sum_cpu > stream.cpu_quota)
-                or (stream.ram_quota > 0 and stream_sum_ram > stream.ram_quota)
-                or (stream.disk_quota > 0 and stream_sum_disk > stream.disk_quota)
-            )
-            dept_data['streams'].append(stream_data)
-            dept_vm_count += stream_vm_count
-            dept_sum_cpu += stream_sum_cpu
-            dept_sum_ram += stream_sum_ram
-            dept_sum_disk += stream_sum_disk
-        dept_data['vm_count'] = dept_vm_count
-        dept_data['sum_cpu'] = dept_sum_cpu
-        dept_data['sum_ram'] = dept_sum_ram
-        dept_data['sum_disk'] = dept_sum_disk
-        # Проверка превышения квот
-        if dept.cpu_quota > 0 and dept_sum_cpu > dept.cpu_quota:
-            dept_has_exceeded = True
-        if dept.ram_quota > 0 and dept_sum_ram > dept.ram_quota:
-            dept_has_exceeded = True
-        if dept.disk_quota > 0 and dept_sum_disk > dept.disk_quota:
-            dept_has_exceeded = True
-        dept_data['has_exceeded'] = dept_has_exceeded
-        result.append(dept_data)
-    orphan_vms = VM.objects.filter(info_system__isnull=True, is_active=True)
-    if orphan_vms.exists():
-        orphan_list = []
-        for vm in orphan_vms:
-            orphan_list.append({
-                'fqdn': vm.fqdn,
-                'ip': vm.ip,
-                'cpu': vm.cpu,
-                'ram': vm.ram,
-                'disk': vm.disk,
-                'ba_pfm_zak': vm.ba_pfm_zak,
-                'ba_pfm_isp': vm.ba_pfm_isp,
-                'ba_programma_byudzheta': vm.ba_programma_byudzheta,
-                'ba_finansovaya_pozitsiya': vm.ba_finansovaya_pozitsiya,
-                'ba_mir_kod': vm.ba_mir_kod,
-                'info_system_deleted': True,  # ВМ без ИС считаются как с удаленной ИС
-            })
-        aggr = orphan_vms.aggregate(sum_cpu=Sum('cpu'), sum_ram=Sum('ram'), sum_disk=Sum('disk'))
-        result.append({
-            'id': None,
-            'name': '(ВМ без ИС / удалённая ИС)',
-            'short_name': '',
-            'vm_count': len(orphan_list),
-            'sum_cpu': aggr['sum_cpu'] or 0,
-            'sum_ram': aggr['sum_ram'] or 0,
-            'sum_disk': aggr['sum_disk'] or 0,
-            'streams': [{
-                'id': None,
-                'name': '—',
-                'cpu_quota': 0,
-                'ram_quota': 0,
-                'disk_quota': 0,
-                'has_exceeded': False,
-                'vm_count': len(orphan_list),
-                'sum_cpu': aggr['sum_cpu'] or 0,
-                'sum_ram': aggr['sum_ram'] or 0,
-                'sum_disk': aggr['sum_disk'] or 0,
-                'info_systems': [{
-                    'id': None,
-                    'name': '—',
-                    'code': '',
-                    'is_id': '',
-                    'vms': orphan_list,
-                    'vm_count': len(orphan_list),
-                    'sum_cpu': aggr['sum_cpu'] or 0,
-                    'sum_ram': aggr['sum_ram'] or 0,
-                    'sum_disk': aggr['sum_disk'] or 0,
-                }],
-            }],
-        })
+    from .report_service import build_report_tree
+    result = build_report_tree()
     import json
     response = HttpResponse(json.dumps(result, ensure_ascii=False, indent=2), content_type='application/json; charset=utf-8')
     response['Content-Disposition'] = 'attachment; filename="vm-inventory-report.json"'

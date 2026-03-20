@@ -14,6 +14,8 @@ router.register('pools', views.PoolViewSet, basename='pool')
 router.register('report', views.ReportViewSet, basename='report')
 
 urlpatterns = [
+    path('health/live/', views.HealthLiveView.as_view(), name='health-live'),
+    path('health/ready/', views.HealthReadyView.as_view(), name='health-ready'),
     path('auth/login/', auth_views.LoginView.as_view(), name='auth-login'),
     path('auth/logout/', auth_views.LogoutView.as_view(), name='auth-logout'),
     path('auth/me/', auth_views.MeView.as_view(), name='auth-me'),
@@ -33,6 +35,8 @@ urlpatterns = [
     path('v1/search', import_export.search, name='search'),
     # Отчет в JSON
     path('v1/report/json', views.ReportViewSet.as_view({'get': 'export_json'}), name='report-json'),
+    # Отчет в PDF
+    path('v1/report/pdf', views.ReportViewSet.as_view({'get': 'pdf'}), name='report-pdf'),
     # Отчет в XLSX
     path('v1/report/xlsx', views.ReportViewSet.as_view({'get': 'export_xlsx'}), name='report-xlsx'),
     # Обратная совместимость со старыми путями

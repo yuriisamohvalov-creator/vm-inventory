@@ -3,6 +3,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.permissions import AllowAny
 
 from .models import Department, Stream, InfoSystem, VM, VMRequest, Pool, PoolVM
 from .serializers import (
@@ -11,6 +12,7 @@ from .serializers import (
 )
 from .report_pdf import build_report_pdf
 from .report_xlsx import build_report_xlsx
+from .report_service import build_report_tree
 
 
 class ReportExportPDFView(APIView):
@@ -25,6 +27,21 @@ class ReportExportPDFView(APIView):
             filename='vm-inventory-report.pdf',
             content_type='application/pdf',
         )
+
+
+class HealthLiveView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        return Response({'status': 'ok'})
+
+
+class HealthReadyView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        VM.objects.exists()
+        return Response({'status': 'ready'})
 
 
 class DepartmentViewSet(viewsets.ModelViewSet):
@@ -262,15 +279,19 @@ def sync_pool_tags(pool, added_pv=None):
     # Добавить остальные теги (коды ИС и кастомные) в алфавитном порядке
     result_tags.extend(sorted(all_tags_set))
     
-    # Обновить теги каждой ВМ в пуле
+    updated_vms = []
+    updated_pvs = []
     for pv in pool_vms:
         vm = pv.vm
-        # Сохранить оригинальные теги при первом добавлении
         if not pv.original_tags:
             pv.original_tags = list(vm.tags or [])
-            pv.save(update_fields=['original_tags'])
+            updated_pvs.append(pv)
         vm.tags = result_tags.copy()
-        vm.save(update_fields=['tags'])
+        updated_vms.append(vm)
+    if updated_pvs:
+        PoolVM.objects.bulk_update(updated_pvs, ['original_tags'])
+    if updated_vms:
+        VM.objects.bulk_update(updated_vms, ['tags'])
 
 
 class PoolViewSet(viewsets.ModelViewSet):
@@ -449,157 +470,7 @@ class ReportViewSet(viewsets.ViewSet):
 
     def list(self, request):
         """Hierarchical report: Department -> Stream -> InfoSystem -> VMs with sums."""
-        from django.db.models import Sum
-        departments = Department.objects.prefetch_related(
-            'streams__info_systems__vms'
-        ).all()
-        result = []
-        for dept in departments:
-            dept_vm_count = 0
-            dept_sum_cpu = 0
-            dept_sum_ram = 0
-            dept_sum_disk = 0
-            # Проверка превышения квот
-            dept_has_exceeded = False
-            dept_data = {
-                'id': dept.id,
-                'name': dept.name,
-                'short_name': dept.short_name or '',
-                'cpu_quota': dept.cpu_quota,
-                'ram_quota': dept.ram_quota,
-                'disk_quota': dept.disk_quota,
-                'streams': []
-            }
-            for stream in dept.streams.all():
-                stream_vm_count = 0
-                stream_sum_cpu = 0
-                stream_sum_ram = 0
-                stream_sum_disk = 0
-                stream_data = {
-                    'id': stream.id,
-                    'name': stream.name,
-                    'cpu_quota': stream.cpu_quota,
-                    'ram_quota': stream.ram_quota,
-                    'disk_quota': stream.disk_quota,
-                    'info_systems': [],
-                }
-                for isys in stream.info_systems.all():
-                    vms_qs = isys.vms.filter(is_active=True)
-                    vms_list = []
-                    for vm in vms_qs:
-                        # Проверка, удалена ли ИС
-                        is_deleted = vm.info_system is None
-                        vms_list.append({
-                            'fqdn': vm.fqdn,
-                            'ip': vm.ip,
-                            'cpu': vm.cpu,
-                            'ram': vm.ram,
-                            'disk': vm.disk,
-                            'ba_pfm_zak': vm.ba_pfm_zak,
-                            'ba_pfm_isp': vm.ba_pfm_isp,
-                            'ba_programma_byudzheta': vm.ba_programma_byudzheta,
-                            'ba_finansovaya_pozitsiya': vm.ba_finansovaya_pozitsiya,
-                            'ba_mir_kod': vm.ba_mir_kod,
-                            'info_system_deleted': is_deleted,
-                        })
-                    aggr = vms_qs.aggregate(
-                        sum_cpu=Sum('cpu'),
-                        sum_ram=Sum('ram'),
-                        sum_disk=Sum('disk'),
-                    )
-                    is_vm_count = len(vms_list)
-                    is_sum_cpu = aggr['sum_cpu'] or 0
-                    is_sum_ram = aggr['sum_ram'] or 0
-                    is_sum_disk = aggr['sum_disk'] or 0
-                    stream_data['info_systems'].append({
-                        'id': isys.id,
-                        'name': isys.name,
-                        'vms': vms_list,
-                        'vm_count': is_vm_count,
-                        'sum_cpu': is_sum_cpu,
-                        'sum_ram': is_sum_ram,
-                        'sum_disk': is_sum_disk,
-                    })
-                    stream_vm_count += is_vm_count
-                    stream_sum_cpu += is_sum_cpu
-                    stream_sum_ram += is_sum_ram
-                    stream_sum_disk += is_sum_disk
-                stream_data['vm_count'] = stream_vm_count
-                stream_data['sum_cpu'] = stream_sum_cpu
-                stream_data['sum_ram'] = stream_sum_ram
-                stream_data['sum_disk'] = stream_sum_disk
-                stream_data['has_exceeded'] = (
-                    (stream.cpu_quota > 0 and stream_sum_cpu > stream.cpu_quota)
-                    or (stream.ram_quota > 0 and stream_sum_ram > stream.ram_quota)
-                    or (stream.disk_quota > 0 and stream_sum_disk > stream.disk_quota)
-                )
-                dept_data['streams'].append(stream_data)
-                dept_vm_count += stream_vm_count
-                dept_sum_cpu += stream_sum_cpu
-                dept_sum_ram += stream_sum_ram
-                dept_sum_disk += stream_sum_disk
-            dept_data['vm_count'] = dept_vm_count
-            dept_data['sum_cpu'] = dept_sum_cpu
-            dept_data['sum_ram'] = dept_sum_ram
-            dept_data['sum_disk'] = dept_sum_disk
-            # Проверка превышения квот
-            if dept.cpu_quota > 0 and dept_sum_cpu > dept.cpu_quota:
-                dept_has_exceeded = True
-            if dept.ram_quota > 0 and dept_sum_ram > dept.ram_quota:
-                dept_has_exceeded = True
-            if dept.disk_quota > 0 and dept_sum_disk > dept.disk_quota:
-                dept_has_exceeded = True
-            dept_data['has_exceeded'] = dept_has_exceeded
-            result.append(dept_data)
-        # Orphan VMs (info_system deleted)
-        orphan_vms = VM.objects.filter(info_system__isnull=True, is_active=True)
-        if orphan_vms.exists():
-            orphan_list = []
-            for vm in orphan_vms:
-                orphan_list.append({
-                    'fqdn': vm.fqdn,
-                    'ip': vm.ip,
-                    'cpu': vm.cpu,
-                    'ram': vm.ram,
-                    'disk': vm.disk,
-                    'ba_pfm_zak': vm.ba_pfm_zak,
-                    'ba_pfm_isp': vm.ba_pfm_isp,
-                    'ba_programma_byudzheta': vm.ba_programma_byudzheta,
-                    'ba_finansovaya_pozitsiya': vm.ba_finansovaya_pozitsiya,
-                    'ba_mir_kod': vm.ba_mir_kod,
-                    'info_system_deleted': True,  # ВМ без ИС считаются как с удаленной ИС
-                })
-            aggr = orphan_vms.aggregate(
-                sum_cpu=Sum('cpu'),
-                sum_ram=Sum('ram'),
-                sum_disk=Sum('disk'),
-            )
-            result.append({
-                'id': None,
-                'name': '(ВМ без ИС / удалённая ИС)',
-                'vm_count': len(orphan_list),
-                'sum_cpu': aggr['sum_cpu'] or 0,
-                'sum_ram': aggr['sum_ram'] or 0,
-                'sum_disk': aggr['sum_disk'] or 0,
-                'streams': [{
-                    'id': None,
-                    'name': '—',
-                    'vm_count': len(orphan_list),
-                    'sum_cpu': aggr['sum_cpu'] or 0,
-                    'sum_ram': aggr['sum_ram'] or 0,
-                    'sum_disk': aggr['sum_disk'] or 0,
-                    'info_systems': [{
-                        'id': None,
-                        'name': '—',
-                        'vms': orphan_list,
-                        'vm_count': len(orphan_list),
-                        'sum_cpu': aggr['sum_cpu'] or 0,
-                        'sum_ram': aggr['sum_ram'] or 0,
-                        'sum_disk': aggr['sum_disk'] or 0,
-                    }],
-                }],
-            })
-        return Response(result)
+        return Response(build_report_tree())
 
     @action(detail=False, methods=['get'], url_path='pdf')
     def pdf(self, request):

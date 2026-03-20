@@ -1,4 +1,4 @@
-import { Fragment, useState, useEffect } from 'react'
+import { Fragment, useState, useEffect, useMemo } from 'react'
 import { api } from '../api'
 
 const OS_OPTIONS = [
@@ -54,9 +54,20 @@ export default function VMs({ canWrite = false }) {
   useEffect(() => { load() }, [])
 
 
+  const vmIpIndex = useMemo(() => {
+    const index = new Map()
+    for (const vm of (Array.isArray(vms) ? vms : [])) {
+      if (vm?.ip) index.set(vm.ip, vm)
+    }
+    return index
+  }, [vms])
+
   // Group VMs by Department -> Stream -> Info System
-  const groupVmsForTable = () => {
+  const groupVmsForTable = useMemo(() => {
     const grouped = {}
+    const infoSystemById = new Map(infoSystems.map((it) => [it.id, it]))
+    const streamById = new Map(streams.map((it) => [it.id, it]))
+    const departmentById = new Map(departments.map((it) => [it.id, it]))
 
     const vmsWithInfo = vms.map(vm => {
       let departmentId = null
@@ -68,15 +79,15 @@ export default function VMs({ canWrite = false }) {
 
       if (vm.info_system) {
         infoSystemId = vm.info_system
-        const infoSystem = infoSystems.find(is => is.id === vm.info_system)
+        const infoSystem = infoSystemById.get(vm.info_system)
         if (infoSystem) {
           infoSystemName = infoSystem.name
           streamId = infoSystem.stream
-          const stream = streams.find(s => s.id === streamId)
+          const stream = streamById.get(streamId)
           if (stream) {
             streamName = stream.name
             departmentId = stream.department
-            const department = departments.find(d => d.id === departmentId)
+            const department = departmentById.get(departmentId)
             if (department) {
               departmentName = department.name
             }
@@ -121,9 +132,9 @@ export default function VMs({ canWrite = false }) {
     })
 
     return grouped
-  }
+  }, [departments, infoSystems, streams, vms])
 
-  const groupedVms = groupVmsForTable()
+  const groupedVms = groupVmsForTable
   const list = Array.isArray(vms) ? vms : (vms.results || [])
 
   const buildTags = () => {
@@ -160,10 +171,8 @@ export default function VMs({ canWrite = false }) {
       return
     }
     try {
-      const allVms = await api.vms.list(false)
-      const vmsList = Array.isArray(allVms) ? allVms : (allVms.results || [])
-      const duplicate = vmsList.find(vm => vm.ip === ip && (!editing || vm.id !== editing.id))
-      if (duplicate) {
+      const duplicate = vmIpIndex.get(ip)
+      if (duplicate && (!editing || duplicate.id !== editing.id)) {
         setIpWarning(`ВМ с IP адресом ${ip} уже существует: ${duplicate.fqdn}`)
       } else {
         setIpWarning('')

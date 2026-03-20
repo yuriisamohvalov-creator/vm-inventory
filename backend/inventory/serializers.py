@@ -132,20 +132,6 @@ class VMSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError('Каждый октет IP адреса должен быть от 0 до 255.')
         return value
 
-    def validate(self, attrs):
-        # Проверка на дубликаты IP (кроме текущей ВМ при редактировании)
-        ip_value = attrs.get('ip')
-        if ip_value and ip_value != '000.000.000.000':
-            instance = self.instance
-            qs = VM.objects.filter(ip=ip_value)
-            if instance:
-                qs = qs.exclude(pk=instance.pk)
-            if qs.exists():
-                raise serializers.ValidationError({
-                    'ip': f'ВМ с IP адресом {ip_value} уже существует: {qs.first().fqdn}'
-                })
-        return super().validate(attrs)
-
     def validate_instance(self, value):
         if value is None or value < 1 or value > 20:
             raise serializers.ValidationError('Instance должен быть от 1 до 20.')
@@ -160,6 +146,17 @@ class VMSerializer(serializers.ModelSerializer):
         return (is_obj.code or '').strip().upper().replace(' ', '_')
 
     def validate(self, attrs):
+        # Проверка на дубликаты IP (кроме текущей ВМ при редактировании)
+        ip_value = attrs.get('ip')
+        if ip_value and ip_value != '000.000.000.000':
+            instance = self.instance
+            qs = VM.objects.filter(ip=ip_value)
+            if instance:
+                qs = qs.exclude(pk=instance.pk)
+            if qs.exists():
+                raise serializers.ValidationError({
+                    'ip': f'ВМ с IP адресом {ip_value} уже существует: {qs.first().fqdn}'
+                })
         os_tag = attrs.get('tags') and len(attrs['tags']) > 0 and attrs['tags'][0]
         if os_tag and os_tag not in ('LINUX', 'WINDOWS', 'MACOS'):
             raise serializers.ValidationError({'tags': 'Первый тег должен быть LINUX, WINDOWS или MACOS.'})
@@ -168,7 +165,7 @@ class VMSerializer(serializers.ModelSerializer):
             is_code = self._is_code_tag(info_system)
             if attrs['tags'][1] != is_code:
                 attrs['tags'] = [attrs['tags'][0], is_code] + list(attrs['tags'][2:])
-        return attrs
+        return super().validate(attrs)
 
     def create(self, validated_data):
         info_system = validated_data.get('info_system')

@@ -178,37 +178,10 @@ export const api = {
     /** Получение иерархического отчета для экрана отчетности. */
     list: () => request('/report/'),
     /** Экспорт отчёта в PDF (возвращает Blob для download-ссылки). */
-    exportPdf: async () => {
-      const url = `${API}/report/export/`;
-      const token = getStoredToken();
-      const res = await fetch(url, {
-        credentials: 'same-origin',
-        headers: token ? { Authorization: `Token ${token}` } : {},
-      });
-      if (!res.ok) throw Object.assign(new Error(res.statusText), { status: res.status });
-      return res.blob();
-    },
+    exportPdf: () => request('/v1/report/pdf'),
     /** Экспорт отчёта в XLSX (возвращает Blob для download-ссылки). */
-    exportXlsx: async () => {
-      const url = `${API}/v1/report/xlsx`;
-      const token = getStoredToken();
-      const res = await fetch(url, {
-        credentials: 'same-origin',
-        headers: token ? { Authorization: `Token ${token}` } : {},
-      });
-      if (!res.ok) throw Object.assign(new Error(res.statusText), { status: res.status });
-      return res.blob();
-    },
+    exportXlsx: () => request('/v1/report/xlsx'),
     /** Экспорт отчёта в JSON (возвращает Blob для download-ссылки). */
-    exportJson: async () => {
-      const url = `${API}/v1/report/json`;
-      const token = getStoredToken();
-      const res = await fetch(url, {
-        credentials: 'same-origin',
-        headers: token ? { Authorization: `Token ${token}` } : {},
-      });
-      if (!res.ok) throw Object.assign(new Error(res.statusText), { status: res.status });
-      return res.blob();
-    },
+    exportJson: () => request('/v1/report/json'),
   },
 };
