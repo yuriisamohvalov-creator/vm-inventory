@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VM Inventory — Инструкции</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; background: #f5f7fb; color: #111827; }
+    main { max-width: 900px; margin: 2rem auto; background: #fff; border-radius: 12px; padding: 2rem; box-shadow: 0 8px 24px rgba(0,0,0,.06); }
+    h1 { margin-top: 0; }
+    .grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit,minmax(240px,1fr)); }
+    a.card { display: block; border: 1px solid #e5e7eb; border-radius: 10px; padding: 1rem; text-decoration: none; color: inherit; }
+    a.card:hover { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,.15); }
+    small { color: #4b5563; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Инструкции VM Inventory</h1>
+    <p>Выберите нужный документ:</p>
+    <div class="grid">
+      <a class="card" href="/instructions/user-guide.html" target="_blank" rel="noopener noreferrer">
+        <h3>Руководство пользователя</h3>
+        <small>Работа с ВМ, пулами, отчетами и базовыми сценариями.</small>
+      </a>
+      <a class="card" href="/instructions/admin-guide.html" target="_blank" rel="noopener noreferrer">
+        <h3>Руководство администратора</h3>
+        <small>Развертывание, создание пользователей и рекомендации по Kubernetes.</small>
+      </a>
+    </div>
+  </main>
+</body>
+</html>

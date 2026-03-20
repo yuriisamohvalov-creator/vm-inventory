@@ -7,16 +7,33 @@ import Reports from './pages/Reports'
 import Login from './pages/Login'
 import { api, getStoredToken, getStoredUser } from './api'
 
+/**
+ * Корневой компонент SPA.
+ *
+ * Назначение:
+ * - восстанавливает пользовательскую сессию по токену;
+ * - отображает экран логина, если сессии нет;
+ * - управляет маршрутизацией между разделами приложения.
+ *
+ * Взаимодействия:
+ * - `api.auth.me()` проверяет токен и возвращает профиль пользователя;
+ * - `api.auth.logout()` инвалидирует сессию на сервере и очищает локальные данные;
+ * - `BrowserRouter` и `Routes` обеспечивают навигацию внутри SPA.
+ */
 function App() {
+  /** Храним данные текущего пользователя между рендерами. */
   const [user, setUser] = useState(getStoredUser())
+  /** Пока есть токен, показываем индикатор проверки сессии. */
   const [loadingUser, setLoadingUser] = useState(!!getStoredToken())
 
   useEffect(() => {
+    // Если токена нет, проверять сессию на сервере не требуется.
     if (!getStoredToken()) {
       setLoadingUser(false)
       return
     }
 
+    // Проверяем действительность токена и загружаем профиль.
     api.auth.me()
       .then((u) => setUser(u))
       .catch(() => setUser(null))
@@ -25,8 +42,14 @@ function App() {
 
   if (loadingUser) return <p className="empty-hint">Проверка сессии...</p>
   if (!user) return <Login onLogin={setUser} />
+
+  // Признак прав на изменение данных (CRUD).
   const canWrite = user.is_superuser || (user.roles || []).includes('administrator')
 
+  /**
+   * Выход из системы.
+   * Сначала пробуем завершить сессию на сервере, затем очищаем локальный стейт.
+   */
   const handleLogout = async () => {
     await api.auth.logout()
     setUser(null)
@@ -42,6 +65,9 @@ function App() {
             <NavLink to="/pools">Общие пулы</NavLink>
             <NavLink to="/reports">Отчеты</NavLink>
             <NavLink to="/admin">Администрирование</NavLink>
+            {/* Swagger и пользовательские инструкции открываются в новой вкладке,
+                чтобы не прерывать рабочий процесс в основном интерфейсе. */}
+            <a href="/instructions/index.html" target="_blank" rel="noopener noreferrer">Инструкции</a>
             <a href="/api/docs/" target="_blank" rel="noopener noreferrer">API Swagger</a>
           </nav>
           <div className="sidebar-user">
