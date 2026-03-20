@@ -102,6 +102,28 @@ class VM(models.Model):
         return None
 
 
+class VMRequest(models.Model):
+    REQUEST_TYPE_CHOICES = [
+        ('CREATE', 'Создание'),
+        ('UPDATE', 'Изменение'),
+        ('DELETE', 'Удаление'),
+    ]
+
+    vm = models.ForeignKey(VM, on_delete=models.CASCADE, related_name='requests')
+    request_type = models.CharField(max_length=10, choices=REQUEST_TYPE_CHOICES)
+    request_number = models.CharField(max_length=255, blank=True, default='')
+    contractor_task_number = models.CharField(max_length=255, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"[{self.get_request_type_display()}] {self.vm.fqdn} - {self.request_number}"
+
+
 class Pool(models.Model):
     name = models.CharField(max_length=255)
     created_at = models.DateTimeField(auto_now_add=True)

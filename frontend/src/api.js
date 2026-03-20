@@ -146,6 +146,14 @@ export const api = {
     update: (id, data) => request(`/vms/${id}/`, { method: 'PATCH', body: JSON.stringify(data) }),
     delete: (id) => request(`/vms/${id}/`, { method: 'DELETE' }),
     restore: (id) => request(`/vms/${id}/restore/`, { method: 'POST' }),
+    /** Запросы по ВМ */
+    requests: {
+      list: (vmId) => request(vmId ? `/vm-requests/?vm_id=${vmId}` : '/vm-requests/'),
+      get: (id) => request(`/vm-requests/${id}/`),
+      create: (data) => request('/vm-requests/', { method: 'POST', body: JSON.stringify(data) }),
+      update: (id, data) => request(`/vm-requests/${id}/`, { method: 'PATCH', body: JSON.stringify(data) }),
+      delete: (id) => request(`/vm-requests/${id}/`, { method: 'DELETE' }),
+    },
   },
   pools: {
     /** CRUD общих пулов + операции включения/исключения ВМ из пула. */

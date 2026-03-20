@@ -4,10 +4,10 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import Department, Stream, InfoSystem, VM, Pool, PoolVM
+from .models import Department, Stream, InfoSystem, VM, VMRequest, Pool, PoolVM
 from .serializers import (
     DepartmentSerializer, StreamSerializer, InfoSystemSerializer,
-    VMSerializer, PoolSerializer, PoolDetailSerializer, PoolVMSerializer,
+    VMSerializer, VMRequestSerializer, PoolSerializer, PoolDetailSerializer, PoolVMSerializer,
 )
 from .report_pdf import build_report_pdf
 from .report_xlsx import build_report_xlsx
@@ -175,6 +175,18 @@ class InfoSystemViewSet(viewsets.ModelViewSet):
             'created': len(created),
             'items': created
         }, status=status.HTTP_201_CREATED)
+
+
+class VMRequestViewSet(viewsets.ModelViewSet):
+    queryset = VMRequest.objects.select_related('vm', 'vm__info_system').all()
+    serializer_class = VMRequestSerializer
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        vm_id = self.request.query_params.get('vm_id')
+        if vm_id:
+            qs = qs.filter(vm_id=vm_id)
+        return qs
 
 
 class VMViewSet(viewsets.ModelViewSet):

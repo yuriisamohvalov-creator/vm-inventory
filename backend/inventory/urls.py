@@ -9,6 +9,7 @@ router.register('departments', views.DepartmentViewSet, basename='department')
 router.register('streams', views.StreamViewSet, basename='stream')
 router.register('info-systems', views.InfoSystemViewSet, basename='infosystem')
 router.register('vms', views.VMViewSet, basename='vm')
+router.register('vm-requests', views.VMRequestViewSet, basename='vmrequest')
 router.register('pools', views.PoolViewSet, basename='pool')
 router.register('report', views.ReportViewSet, basename='report')
 

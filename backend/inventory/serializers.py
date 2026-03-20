@@ -1,6 +1,6 @@
 from django.db.models import Sum
 from rest_framework import serializers
-from .models import Department, Stream, InfoSystem, VM, Pool, PoolVM
+from .models import Department, Stream, InfoSystem, VM, VMRequest, Pool, PoolVM
 
 
 class DepartmentSerializer(serializers.ModelSerializer):
@@ -69,10 +69,21 @@ class InfoSystemSerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'code', 'is_id', 'stream', 'stream_name', 'department_name']
 
 
+class VMRequestSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = VMRequest
+        fields = [
+            'id', 'vm', 'request_type', 'request_number', 'contractor_task_number',
+            'created_at', 'updated_at', 'deleted_at',
+        ]
+        read_only_fields = ['created_at', 'updated_at', 'deleted_at']
+
+
 class VMSerializer(serializers.ModelSerializer):
     info_system_name = serializers.SerializerMethodField()
     info_system_code = serializers.SerializerMethodField()
     status = serializers.SerializerMethodField()
+    requests = VMRequestSerializer(many=True, read_only=True)
 
     class Meta:
         model = VM
@@ -82,6 +93,7 @@ class VMSerializer(serializers.ModelSerializer):
             'ba_pfm_zak', 'ba_pfm_isp', 'ba_programma_byudzheta',
             'ba_finansovaya_pozitsiya', 'ba_mir_kod',
             'created_at', 'updated_at', 'deleted_at', 'is_active', 'status',
+            'requests',
         ]
         read_only_fields = ['created_at', 'updated_at', 'deleted_at', 'status']
 

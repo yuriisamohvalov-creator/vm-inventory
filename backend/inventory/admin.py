@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Department, Stream, InfoSystem, VM, Pool, PoolVM, UserProfile
+from .models import Department, Stream, InfoSystem, VM, VMRequest, Pool, PoolVM, UserProfile
 
 
 @admin.register(Department)
@@ -34,6 +34,13 @@ class PoolAdmin(admin.ModelAdmin):
 @admin.register(PoolVM)
 class PoolVMAdmin(admin.ModelAdmin):
     list_display = ('pool', 'vm', 'added_at', 'removed_at')
+
+
+@admin.register(VMRequest)
+class VMRequestAdmin(admin.ModelAdmin):
+    list_display = ('vm', 'request_type', 'request_number', 'contractor_task_number', 'created_at', 'updated_at', 'deleted_at')
+    list_filter = ('request_type',)
+    search_fields = ('vm__fqdn', 'request_number', 'contractor_task_number')
 
 
 @admin.register(UserProfile)
