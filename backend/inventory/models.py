@@ -113,6 +113,7 @@ class VMRequest(models.Model):
     request_type = models.CharField(max_length=10, choices=REQUEST_TYPE_CHOICES)
     request_number = models.CharField(max_length=255, blank=True, default='')
     contractor_task_number = models.CharField(max_length=255, blank=True, default='')
+    request_date = models.DateField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     deleted_at = models.DateTimeField(null=True, blank=True)

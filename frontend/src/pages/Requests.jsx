@@ -33,6 +33,11 @@ export default function Requests() {
     return date.toLocaleString('ru-RU')
   }
 
+  const formatRequestDate = (item) => {
+    if (item.request_date) return item.request_date
+    return formatDateTime(item.created_at)
+  }
+
   return (
     <>
       <h1 className="page-title">Заявки по ВМ</h1>
@@ -54,7 +59,7 @@ export default function Requests() {
                   <td>{item.vm_fqdn || `VM #${item.vm}`}</td>
                   <td>{REQUEST_LABELS[item.request_type] || item.request_type || '—'} {item.request_number ? `(${item.request_number})` : ''}</td>
                   <td>{item.contractor_task_number || '—'}</td>
-                  <td>{formatDateTime(item.created_at)}</td>
+                  <td>{formatRequestDate(item)}</td>
                 </tr>
               ))}
               {requests.length === 0 && !error && (

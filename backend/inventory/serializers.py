@@ -71,12 +71,18 @@ class InfoSystemSerializer(serializers.ModelSerializer):
 
 class VMRequestSerializer(serializers.ModelSerializer):
     vm_fqdn = serializers.CharField(source='vm.fqdn', read_only=True)
+    request_date = serializers.DateField(
+        required=False,
+        allow_null=True,
+        format='%d.%m.%Y',
+        input_formats=['%d.%m.%Y', '%Y-%m-%d'],
+    )
 
     class Meta:
         model = VMRequest
         fields = [
             'id', 'vm', 'vm_fqdn', 'request_type', 'request_number', 'contractor_task_number',
-            'created_at', 'updated_at', 'deleted_at',
+            'request_date', 'created_at', 'updated_at', 'deleted_at',
         ]
         read_only_fields = ['created_at', 'updated_at', 'deleted_at']
 

@@ -22,6 +22,9 @@ const defaultForm = {
   ba_programma_byudzheta: '',
   ba_finansovaya_pozitsiya: '00.00.00.00',
   ba_mir_kod: 'ITI_000_0000',
+  request_number: '',
+  contractor_task_number: '',
+  request_date: '',
 }
 
 export default function VMs({ canWrite = false }) {
@@ -36,6 +39,30 @@ export default function VMs({ canWrite = false }) {
   const [error, setError] = useState('')
   const [deleteError, setDeleteError] = useState('')
   const [ipWarning, setIpWarning] = useState('')
+  const [deleteModal, setDeleteModal] = useState({ open: false, vm: null, request_number: '', contractor_task_number: '', request_date: '' })
+
+  const toIsoDate = (ddmmyyyy) => {
+    const m = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec((ddmmyyyy || '').trim())
+    if (!m) return ''
+    return `${m[3]}-${m[2]}-${m[1]}`
+  }
+
+  const toRuDate = (iso) => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec((iso || '').trim())
+    if (!m) return ''
+    return `${m[3]}.${m[2]}.${m[1]}`
+  }
+
+  const isValidRuDate = (value) => {
+    if (!value) return true
+    const m = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec(value.trim())
+    if (!m) return false
+    const day = Number(m[1])
+    const month = Number(m[2])
+    const year = Number(m[3])
+    const date = new Date(year, month - 1, day)
+    return date.getFullYear() === year && date.getMonth() === (month - 1) && date.getDate() === day
+  }
 
   const formatDateTime = (value) => {
     if (!value) return '—'
@@ -192,6 +219,10 @@ export default function VMs({ canWrite = false }) {
       setError(ipError)
       return
     }
+    if (!isValidRuDate(form.request_date)) {
+      setError('Дата заявки должна быть в формате dd.mm.yyyy')
+      return
+    }
     
     const payload = {
       fqdn: form.fqdn.trim(),
@@ -209,10 +240,20 @@ export default function VMs({ canWrite = false }) {
       ba_mir_kod: form.ba_mir_kod,
     }
     try {
+      let savedVm
       if (editing) {
-        await api.vms.update(editing.id, payload)
+        savedVm = await api.vms.update(editing.id, payload)
       } else {
-        await api.vms.create(payload)
+        savedVm = await api.vms.create(payload)
+      }
+      if (form.request_number || form.contractor_task_number || form.request_date) {
+        await api.vms.requests.create({
+          vm: savedVm.id,
+          request_type: editing ? 'UPDATE' : 'CREATE',
+          request_number: form.request_number || '',
+          contractor_task_number: form.contractor_task_number || '',
+          request_date: form.request_date || null,
+        })
       }
       setEditing(null)
       setShowForm(false)
@@ -249,6 +290,9 @@ export default function VMs({ canWrite = false }) {
       ba_programma_byudzheta: vm.ba_programma_byudzheta || '',
       ba_finansovaya_pozitsiya: vm.ba_finansovaya_pozitsiya || '00.00.00.00',
       ba_mir_kod: vm.ba_mir_kod || 'ITI_000_0000',
+      request_number: '',
+      contractor_task_number: '',
+      request_date: '',
     })
     setCustomInput('')
     setIpWarning('')
@@ -263,6 +307,44 @@ export default function VMs({ canWrite = false }) {
 
   const removeCustomTag = (t) => {
     setForm((f) => ({ ...f, customTags: f.customTags.filter((x) => x !== t) }))
+  }
+
+  const openDeleteModal = (vm) => {
+    setDeleteModal({
+      open: true,
+      vm,
+      request_number: '',
+      contractor_task_number: '',
+      request_date: '',
+    })
+  }
+
+  const closeDeleteModal = () => {
+    setDeleteModal({ open: false, vm: null, request_number: '', contractor_task_number: '', request_date: '' })
+  }
+
+  const confirmDeleteVm = async () => {
+    if (!deleteModal.vm) return
+    if (!isValidRuDate(deleteModal.request_date)) {
+      setDeleteError('Дата заявки должна быть в формате dd.mm.yyyy')
+      return
+    }
+    setDeleteError('')
+    try {
+      await api.vms.requests.create({
+        vm: deleteModal.vm.id,
+        request_type: 'DELETE',
+        request_number: deleteModal.request_number || '',
+        contractor_task_number: deleteModal.contractor_task_number || '',
+        request_date: deleteModal.request_date || null,
+      })
+      await api.vms.delete(deleteModal.vm.id)
+      closeDeleteModal()
+      load()
+    } catch (err) {
+      const msg = err.body?.detail || err.body?.error || err.message || 'Не удалось удалить ВМ'
+      setDeleteError(msg)
+    }
   }
 
   return (
@@ -439,6 +521,40 @@ export default function VMs({ canWrite = false }) {
               />
             </div>
           </div>
+          <h4 style={{ margin: '1.5rem 0 0.5rem 0', color: '#666' }}>Реквизиты заявки</h4>
+          <div className="form-row">
+            <div className="form-group">
+              <label>Заявка</label>
+              <input
+                value={form.request_number}
+                onChange={(e) => setForm((f) => ({ ...f, request_number: e.target.value }))}
+                placeholder="Номер заявки"
+              />
+            </div>
+            <div className="form-group">
+              <label>Задача</label>
+              <input
+                value={form.contractor_task_number}
+                onChange={(e) => setForm((f) => ({ ...f, contractor_task_number: e.target.value }))}
+                placeholder="Номер задачи"
+              />
+            </div>
+            <div className="form-group">
+              <label>Дата (dd.mm.yyyy)</label>
+              <input
+                value={form.request_date}
+                onChange={(e) => setForm((f) => ({ ...f, request_date: e.target.value }))}
+                placeholder="31.12.2026"
+              />
+              <div style={{ marginTop: '0.4rem' }}>
+                <input
+                  type="date"
+                  value={toIsoDate(form.request_date)}
+                  onChange={(e) => setForm((f) => ({ ...f, request_date: toRuDate(e.target.value) }))}
+                />
+              </div>
+            </div>
+          </div>
           {error && <p className="error-msg">{error}</p>}
           <button type="submit" className="btn">{editing ? 'Сохранить' : 'Создать'}</button>
           <button type="button" className="btn btn-secondary" style={{ marginLeft: '0.5rem' }} onClick={() => { setEditing(null); setForm(defaultForm); setShowForm(false); }}>
@@ -519,17 +635,7 @@ export default function VMs({ canWrite = false }) {
                                   className="btn btn-sm btn-danger"
                                   style={{ marginLeft: '0.5rem' }}
                                   disabled={!vm.is_active}
-                                  onClick={async () => {
-                                    if (!confirm('Удалить ВМ?')) return
-                                    setDeleteError('')
-                                    try {
-                                      await api.vms.delete(vm.id)
-                                      load()
-                                    } catch (err) {
-                                      const msg = err.body?.detail || err.body?.error || err.message || 'Не удалось удалить ВМ'
-                                      setDeleteError(msg)
-                                    }
-                                  }}
+                                  onClick={() => openDeleteModal(vm)}
                                 >
                                   Удалить
                                 </button>
@@ -569,6 +675,47 @@ export default function VMs({ canWrite = false }) {
           </table>
         </div>
       </div>
+      {deleteModal.open && (
+        <div className="modal-overlay">
+          <div className="modal">
+            <h3 style={{ marginTop: 0 }}>Удаление ВМ: {deleteModal.vm?.fqdn}</h3>
+            <div className="form-group">
+              <label>Заявка</label>
+              <input
+                value={deleteModal.request_number}
+                onChange={(e) => setDeleteModal((d) => ({ ...d, request_number: e.target.value }))}
+                placeholder="Номер заявки"
+              />
+            </div>
+            <div className="form-group">
+              <label>Задача</label>
+              <input
+                value={deleteModal.contractor_task_number}
+                onChange={(e) => setDeleteModal((d) => ({ ...d, contractor_task_number: e.target.value }))}
+                placeholder="Номер задачи"
+              />
+            </div>
+            <div className="form-group">
+              <label>Дата (dd.mm.yyyy)</label>
+              <input
+                value={deleteModal.request_date}
+                onChange={(e) => setDeleteModal((d) => ({ ...d, request_date: e.target.value }))}
+                placeholder="31.12.2026"
+              />
+              <div style={{ marginTop: '0.4rem' }}>
+                <input
+                  type="date"
+                  value={toIsoDate(deleteModal.request_date)}
+                  onChange={(e) => setDeleteModal((d) => ({ ...d, request_date: toRuDate(e.target.value) }))}
+                />
+              </div>
+            </div>
+            {deleteError && <p className="error-msg">{deleteError}</p>}
+            <button className="btn btn-danger" type="button" onClick={confirmDeleteVm}>Удалить</button>
+            <button className="btn btn-secondary" type="button" style={{ marginLeft: '0.5rem' }} onClick={closeDeleteModal}>Отмена</button>
+          </div>
+        </div>
+      )}
     </>
   )
 }
