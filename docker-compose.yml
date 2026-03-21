@@ -19,9 +19,11 @@ services:
     command: gunicorn vm_inventory.wsgi:application --bind 0.0.0.0:8000 --workers 2
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-vminventory}:${POSTGRES_PASSWORD:-vminventory_secret}@db:5432/${POSTGRES_DB:-vminventory}
-      SECRET_KEY: ${SECRET_KEY:-dev-secret-key-change-in-production}
+      # Не используйте дефолт из settings.py (dev-secret-key*): при DEBUG=false Django падает при старте.
+      SECRET_KEY: ${SECRET_KEY:-django-docker-dev-only-replace-in-real-deploy}
       DEBUG: ${DEBUG:-false}
-      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,backend,nginx,192.168.20.10}
+      # 127.0.0.1 — для healthcheck изнутри контейнера (urllib → Host: 127.0.0.1)
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1,backend,nginx,192.168.20.10}
       LDAP_URI: ${LDAP_URI:-}
       LDAP_BIND_DN: ${LDAP_BIND_DN:-}
       LDAP_BIND_PASSWORD: ${LDAP_BIND_PASSWORD:-}
@@ -50,9 +52,9 @@ services:
              python manage.py collectstatic --noinput --clear"
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-vminventory}:${POSTGRES_PASSWORD:-vminventory_secret}@db:5432/${POSTGRES_DB:-vminventory}
-      SECRET_KEY: ${SECRET_KEY:-dev-secret-key-change-in-production}
+      SECRET_KEY: ${SECRET_KEY:-django-docker-dev-only-replace-in-real-deploy}
       DEBUG: ${DEBUG:-false}
-      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,backend,nginx,192.168.20.10}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1,backend,nginx,192.168.20.10}
       LDAP_URI: ${LDAP_URI:-}
       LDAP_BIND_DN: ${LDAP_BIND_DN:-}
       LDAP_BIND_PASSWORD: ${LDAP_BIND_PASSWORD:-}
